@@ -11,10 +11,6 @@ let terrainHeightCache: Map<string, number> = new Map();
 export function clearTerrainHeightCacheIfNeeded() {
 	if (terrainHeightCache.size > 20) {
 		// 20個以上のキャッシュがたまったらクリア
-		console.log(
-			'キャッシュサイズがしきい値を超えました。キャッシュをクリア:',
-			terrainHeightCache.size
-		);
 		terrainHeightCache = new Map();
 	}
 }
@@ -56,7 +52,6 @@ export async function calculatePopupPosition(
 			if (terrainHeightCache.has(entityId)) {
 				// キャッシュから取得
 				terrainHeight = terrainHeightCache.get(entityId)!;
-				console.log('キャッシュから地形高さを取得:', terrainHeight, 'エンティティID:', entityId);
 			} else {
 				try {
 					// 地形の高さを取得するためのサンプリング
@@ -68,7 +63,6 @@ export async function calculatePopupPosition(
 
 					// 地形高さを取得
 					terrainHeight = updatedPositions[0].height || 0;
-					console.log('取得した地形高さ:', terrainHeight, 'エンティティID:', entityId);
 
 					// キャッシュに保存
 					terrainHeightCache.set(entityId, terrainHeight);

@@ -52,49 +52,13 @@
 				isProcessingClick = true;
 
 				selectedEntity = pickedObject.id;
-
-				// デバッグ：選択されたエンティティとそのプロパティを確認
-				console.log('選択されたEntity:', selectedEntity);
-				console.log('Entity properties:', selectedEntity?.properties);
-
-				// プロパティが定義されている場合、その構造を調査
-				if (selectedEntity?.properties) {
-					console.log('Properties type:', typeof selectedEntity.properties);
-
-					try {
-						// プロパティの構造を調べる
-						// entityHelpers.tsからインポートしたPropertyBagWithIndexを使用
-						const props = selectedEntity.properties as unknown as PropertyBagWithIndex;
-						console.log('Direct properties access:', props);
-
-						// Entityに設定した実際のプロパティをログ
-						if (selectedEntity.id === 'imperial-palace') {
-							console.log('Imperial Palace properties:', {
-								address: props.address,
-								coordinates: props.coordinates,
-								area: props.area,
-								established: props.established,
-								website: props.website
-							});
-						}
-					} catch (err) {
-						console.error('プロパティ調査中にエラーが発生:', err);
-					}
-				}
-
 				// ポップアップの表示モードをクリックに設定
 				displayMode = 'click';
 				isPopupOpen = true;
-				console.log('クリックイベント発生:', {
-					entity: selectedEntity?.id,
-					isPopupOpen,
-					displayMode
-				});
 
 				// クリック処理のクールダウン期間を設定
 				setTimeout(() => {
 					isProcessingClick = false;
-					console.log('クリッククールダウン終了');
 					// クリックモードは継続（displayModeはそのまま）
 				}, clickCooldown);
 			} else {
@@ -109,13 +73,11 @@
 			eventHandler.setInputAction((movement: CesiumType.ScreenSpaceEventHandler.MotionEvent) => {
 				// クリック処理中はホバー処理をスキップ
 				if (isProcessingClick) {
-					console.log('クリック処理中のためホバー処理をスキップ');
 					return;
 				}
 
 				// クリックモードの場合は、何もホバーされていなくてもポップアップを閉じない
 				if (displayMode === 'click') {
-					console.log('クリックモード中なのでポップアップは閉じません');
 					return;
 				}
 
@@ -127,12 +89,6 @@
 
 					// ポップアップを表示
 					isPopupOpen = true;
-					console.log('ホバーイベント発生:', {
-						entity: selectedEntity?.id,
-						position: movement.endPosition,
-						isPopupOpen,
-						displayMode
-					});
 				} else if (!cesium.defined(pickedObject)) {
 					// ホバーモードの時のみ、何もホバーされていない場合はポップアップを閉じる
 					closePopup();
@@ -149,9 +105,6 @@
 	}
 
 	function closePopup() {
-		console.log('closePopup が呼び出されました', {
-			calledBy: new Error().stack?.split('\n')[2] || '不明'
-		});
 		isPopupOpen = false;
 		selectedEntity = undefined;
 	}
