@@ -1,16 +1,15 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-    import { CESIUM_INITIAL_OPTIONS } from './cesiumUtil';
-    import type * as CesiumType from 'cesium';
-    import Entities from './Entities.svelte';
-    import EntityPopup from './EntityPopup.svelte';
+	import { CESIUM_INITIAL_OPTIONS } from './cesiumUtil';
+	import type * as CesiumType from 'cesium';
+	import Entities from './Entities.svelte';
+	import EntityPopup from './EntityPopup.svelte';
 
-    // Cesium モジュールは動的インポートするので、型は import 型を利用
+	// Cesium モジュールは動的インポートするので、型は import 型を利用
 	let cesium: typeof CesiumType;
 	let viewer: CesiumType.Viewer;
 	let viewerReady = false; // viewer の準備状態を追跡するフラグ
-
 
 	onMount(async (): Promise<void> => {
 		if (!browser) return;
@@ -28,8 +27,7 @@
 				CesiumTerrainProvider,
 				IonResource,
 				Cartesian3,
-				Math: CesiumMath,
-				Cartographic
+				Math: CesiumMath
 			} = cesium;
 
 			// アクセストークンの設定
@@ -61,8 +59,8 @@
 			viewer.camera.setView({
 				destination: Cartesian3.fromDegrees(
 					139.754409, // 経度
-					35.670355,  // 緯度
-					5000      // 高度（メートル）
+					35.670355, // 緯度
+					5000 // 高度（メートル）
 				),
 				orientation: {
 					heading: CesiumMath.toRadians(0), // 視点の向き（ヘディング）
@@ -71,25 +69,22 @@
 				}
 			});
 
-
 			// 透過させないようにする
 			viewer.scene.globe.depthTestAgainstTerrain = true;
-			
+
 			// viewerの準備ができたことを示す
 			viewerReady = true;
-
 		} catch (error) {
 			console.error('Cesium の初期化に失敗しました:', error);
 		}
 	});
 </script>
 
-
 <!-- Cesium を描画するコンテナ -->
 <div id="cesiumContainer" class="h-full w-full"></div>
 
 <!-- viewerが準備できたらEntitiesコンポーネントを表示 -->
 {#if viewerReady && viewer && cesium}
-    <Entities {viewer} {cesium} />
-    <EntityPopup {viewer} {cesium} />
+	<Entities {viewer} {cesium} />
+	<EntityPopup {viewer} {cesium} />
 {/if}
