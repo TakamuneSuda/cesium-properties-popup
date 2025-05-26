@@ -2,10 +2,8 @@
 	import { onDestroy, onMount } from 'svelte';
 	import type * as CesiumType from 'cesium';
 	import { throttle } from '../utils/throttle';
-	import {
-		calculatePopupPosition,
-		clearTerrainHeightCacheIfNeeded
-	} from '../utils/popupPositioning';
+	import { calculatePopupPosition } from '../utils/popupPositioning';
+	import { POPUP_SETTINGS } from '../utils/popupSettings';
 
 	export let viewer: CesiumType.Viewer | undefined;
 	export let cesium: typeof CesiumType | undefined;
@@ -17,6 +15,10 @@
 	let preRenderEventRemovalCallback: (() => void) | undefined;
 	// 位置が計算されたかどうかを追跡するフラグ
 	let isPositionCalculated = false;
+
+	// イベント処理の最適化のための状態管理
+	let lastUpdateSource = '';
+	let lastUpdateTime = 0;
 
 	// コンポーネントがマウントされたときにリスナーを設定
 	onMount(() => {
@@ -45,14 +47,14 @@
 		removeCameraChangeListener();
 
 		// スロットリングを適用したリスナー（カメラ動作は特に高頻度になりやすい）
-		// 100msで10FPSに制限（滑らかさはCSSトランジションで得るため頻度を下げる）
+		// 設定値で制限（滑らかさはCSSトランジションで得るため頻度を下げる）
 		const throttledUpdate = throttle(() => {
 			if (isPopupOpen && entity) {
-				updatePopupPosition().catch((error) => {
+				updatePopupPosition('camera').catch((error) => {
 					console.warn('カメラ変更時のポップアップ更新中にエラーが発生:', error);
 				});
 			}
-		}, 100); // 10FPSに制限（更新頻度を下げてCSSトランジションで滑らかさを確保）
+		}, POPUP_SETTINGS.updateFrequency.cameraChangeThrottle); // 設定値に基づく制限
 
 		// 新しいリスナーを追加
 		cameraChangedCallback = throttledUpdate;
@@ -78,11 +80,11 @@
 		// レンダリングループは頻度が高いため、より長い間隔でスロットリング
 		const throttledUpdate = throttle(() => {
 			if (isPopupOpen && entity) {
-				updatePopupPosition().catch((error) => {
+				updatePopupPosition('renderLoop').catch((error) => {
 					console.warn('レンダリングループでのポップアップ更新中にエラーが発生:', error);
 				});
 			}
-		}, 150); // 約6.7FPSに制限（低頻度の更新でCPU負荷を軽減）
+		}, POPUP_SETTINGS.updateFrequency.renderLoopThrottle); // 設定値に基づく制限
 
 		// プリレンダーイベントでポップアップ位置を更新
 		preRenderEventRemovalCallback = viewer.scene.preRender.addEventListener(throttledUpdate);
@@ -96,11 +98,29 @@
 	}
 
 	// 地物の位置に基づいてポップアップ位置を更新
-	async function updatePopupPosition() {
+	async function updatePopupPosition(source: 'camera' | 'renderLoop' | 'reactive' = 'reactive') {
 		if (!entity || !viewer || !cesium) return;
+
+		// イベントソース追跡と重複更新防止
+		const now = Date.now();
+		const timeSinceLastUpdate = now - lastUpdateTime;
+
+		// 異なるイベントソースからの短時間内の更新は最適化
+		// カメラ更新後すぐのレンダリングループ更新は冗長なケースが多い
+		if (
+			source === 'renderLoop' &&
+			lastUpdateSource === 'camera' &&
+			timeSinceLastUpdate < POPUP_SETTINGS.updateFrequency.duplicatePreventionDelay
+		) {
+			return; // カメラ更新直後のレンダリング更新はスキップ
+		}
 
 		const newPosition = await calculatePopupPosition(entity, viewer, cesium, popupPosition);
 		if (newPosition) {
+			// 更新記録
+			lastUpdateTime = now;
+			lastUpdateSource = source;
+
 			// 位置情報の更新
 			popupPosition = newPosition;
 
@@ -126,8 +146,8 @@
 			Promise.resolve().then(() => {
 				// 呼び出し時のエンティティと状態を使って条件チェック
 				if (currentEntity === entity && currentPopupState === isPopupOpen) {
-					// エンティティ変更検知用なので、ここでは直接フラグ操作しない
-					updatePopupPosition().catch((error) => {
+					// エンティティ変更検知用のリアクティブ更新
+					updatePopupPosition('reactive').catch((error) => {
 						console.warn('リアクティブ更新中にエラーが発生:', error);
 					});
 				}
@@ -135,10 +155,7 @@
 		}
 	}
 
-	// キャッシュサイズの管理
-	$: if (isPopupOpen) {
-		clearTerrainHeightCacheIfNeeded();
-	}
+	// LRUキャッシュは自動管理されるため、明示的なクリア処理は不要
 </script>
 
 {#if isPositionCalculated}

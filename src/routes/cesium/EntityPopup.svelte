@@ -3,7 +3,6 @@
 	import type * as CesiumType from 'cesium';
 	import PopupPositioner from './components/PopupPositioner.svelte';
 	import PopupContent from './components/PopupContent.svelte';
-	import type { PropertyBagWithIndex } from './utils/entityHelpers';
 
 	export let viewer: CesiumType.Viewer | undefined;
 	export let cesium: typeof CesiumType | undefined;

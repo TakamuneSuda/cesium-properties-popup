@@ -1,14 +1,6 @@
 import type * as CesiumType from 'cesium';
-import type { Property } from 'cesium';
-
-/**
- * プロパティにインデックスシグネチャを持たせたPropertyBag型
- */
-export interface PropertyBagWithIndex {
-	[key: string]: unknown;
-	propertyNames?: string[];
-	getValue?: (propertyName: string) => unknown;
-}
+import { POPUP_SETTINGS } from './popupSettings';
+import { entityPositionStrategies } from './entityPositionStrategies';
 
 /**
  * 値がCesiumのPropertyオブジェクトかどうかを判定する型ガード
@@ -23,7 +15,17 @@ function isCesiumProperty(value: unknown): value is CesiumType.Property {
 }
 
 /**
+ * プロパティにインデックスシグネチャを持たせたPropertyBag型
+ */
+export interface PropertyBagWithIndex {
+	[key: string]: unknown;
+	propertyNames?: string[];
+	getValue?: (propertyName: string) => unknown;
+}
+
+/**
  * 地物の3D座標を取得する関数
+ * 戦略パターンを使用して、異なるタイプのエンティティに対応
  *
  * @param entity 座標を取得するエンティティ
  * @param cesium Cesiumライブラリの参照
@@ -35,53 +37,11 @@ export function getEntityPosition(
 ): CesiumType.Cartesian3 | undefined {
 	if (!entity || !cesium) return undefined;
 
-	// 位置情報が直接ある場合
-	if (entity.position) {
-		// Property型ガードを使って安全にチェック
-		const property = entity.position;
-		if (
-			typeof property === 'object' &&
-			property !== null &&
-			'getValue' in property &&
-			typeof (property as { getValue?: unknown }).getValue === 'function'
-		) {
-			const julianDate = cesium.JulianDate.now();
-			return (property as Property).getValue(julianDate);
-		}
-	}
-
-	// ポリゴンの場合は中心点を使用
-	if (entity.polygon && entity.polygon.hierarchy) {
-		try {
-			const julianDate = cesium.JulianDate.now();
-			const hierarchy = entity.polygon.hierarchy.getValue(julianDate);
-			if (hierarchy && hierarchy.positions) {
-				// ポリゴンの中心点を計算
-				return cesium.BoundingSphere.fromPoints(hierarchy.positions).center;
-			}
-		} catch (e: unknown) {
-			console.error('ポリゴン中心点計算エラー:', e instanceof Error ? e.message : String(e));
-		}
-	}
-
-	// その他の形状の場合
-	if (entity.billboard) {
-		try {
-			const julianDate = cesium.JulianDate.now();
-			// BillboardGraphics自体にはpositionはないので、entity.positionを使う
-			if (entity.position) {
-				const property = entity.position;
-				if (
-					typeof property === 'object' &&
-					property !== null &&
-					'getValue' in property &&
-					typeof (property as { getValue?: unknown }).getValue === 'function'
-				) {
-					return (property as Property).getValue(julianDate);
-				}
-			}
-		} catch (e: unknown) {
-			console.error('ビルボード位置取得エラー:', e instanceof Error ? e.message : String(e));
+	// 登録された戦略を順番に試す
+	for (const strategy of entityPositionStrategies) {
+		if (strategy.isApplicable(entity)) {
+			const position = strategy.getPosition(entity, cesium);
+			if (position) return position;
 		}
 	}
 
@@ -105,14 +65,15 @@ interface ScreenPosition {
  * @param fallbackPosition エラー時の代替位置
  * @returns スクリーン座標、または変換できない場合はundefined
  */
+
 // 最後に計算された位置を保持する静的変数（スムージング用）
 let lastCalculatedPosition: ScreenPosition | undefined = undefined;
-// スムージング係数 - 値が大きいほど動きが滑らかに（0.0〜1.0の範囲）
-const SMOOTHING_FACTOR = 0.85;
-// 小さな動きを無視する閾値（ピクセル単位）
-const MOVEMENT_THRESHOLD = 2;
+// 設定値を読み込み
+const SMOOTHING_FACTOR = POPUP_SETTINGS.positioning.smoothingFactor;
+// 小さな動きを無視する閾値（ピクセル単位）- 1次フィルター
+const MOVEMENT_THRESHOLD = POPUP_SETTINGS.positioning.thresholds.firstStage;
 // 大きな変動と判定する閾値（ピクセル単位）- この値以上の変化は即座に反映
-const LARGE_MOVEMENT_THRESHOLD = 40;
+const LARGE_MOVEMENT_THRESHOLD = POPUP_SETTINGS.positioning.thresholds.largeMovement;
 
 export function worldPositionToScreenPosition(
 	position: CesiumType.Cartesian3,
@@ -157,7 +118,8 @@ export function worldPositionToScreenPosition(
 			fallbackPosition.y * SMOOTHING_FACTOR + rawY * (1 - SMOOTHING_FACTOR)
 		);
 
-		// 極めて小さな変動は更新しない（微細な揺れを防止）
+		// 1次フィルター: スムージング処理後の微小変動（閾値以下）を抑制
+		// これにより座標計算の揺らぎによる細かいジッターを防止し、動きを安定させる
 		if (
 			Math.abs(fallbackPosition.x - smoothedX) <= MOVEMENT_THRESHOLD &&
 			Math.abs(fallbackPosition.y - smoothedY) <= MOVEMENT_THRESHOLD

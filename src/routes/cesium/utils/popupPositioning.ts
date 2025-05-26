@@ -1,19 +1,13 @@
 import type * as CesiumType from 'cesium';
 import { getEntityPosition, worldPositionToScreenPosition } from './entityHelpers';
+import { LRUCache } from './terrainHeightCache';
+import { POPUP_SETTINGS } from './popupSettings';
 
-// 地形高さのキャッシュを保持するマップ
-let terrainHeightCache: Map<string, number> = new Map();
+// 地形高さのキャッシュをLRUキャッシュで保持（最大20エントリ）
+const terrainHeightCache = new LRUCache<string, number>(20);
 
-/**
- * キャッシュのクリア処理
- * キャッシュサイズが閾値を超えた場合にクリアします
- */
-export function clearTerrainHeightCacheIfNeeded() {
-	if (terrainHeightCache.size > 20) {
-		// 20個以上のキャッシュがたまったらクリア
-		terrainHeightCache = new Map();
-	}
-}
+// 2次フィルター用の閾値（UIの微小更新を防止）
+const UI_UPDATE_THRESHOLD = POPUP_SETTINGS.positioning.thresholds.secondStage;
 
 /**
  * 地物の位置に基づいてポップアップ位置を更新する関数
@@ -106,10 +100,11 @@ export async function calculatePopupPosition(
 		// worldPositionToScreenPosition関数でスムージングが強化されたため、
 		// ここでは別途の補間処理は行わず、そのまま位置を返す
 		if (screenPosition) {
-			// 極めて小さな変動（1px以内）は更新しない
+			// 2次フィルター: UIの微小更新を防止
+			// DOMの更新頻度を減らすためのフィルター（設定値を使用）
 			if (
-				Math.abs(currentPosition.x - screenPosition.x) <= 1 &&
-				Math.abs(currentPosition.y - screenPosition.y) <= 1
+				Math.abs(currentPosition.x - screenPosition.x) <= UI_UPDATE_THRESHOLD &&
+				Math.abs(currentPosition.y - screenPosition.y) <= UI_UPDATE_THRESHOLD
 			) {
 				return currentPosition;
 			}
