@@ -4,12 +4,23 @@
 	import { CESIUM_INITIAL_OPTIONS } from './cesiumUtil';
 	import type * as CesiumType from 'cesium';
 	import Entities from './Entities.svelte';
-	import EntityPopup from './EntityPopup.svelte';
+	// ライブラリからEntityPopupをインポート
+	import { EntityPopup, type EntityPopupOptions } from '$lib';
 
 	// Cesium モジュールは動的インポートするので、型は import 型を利用
-	let cesium: typeof CesiumType;
-	let viewer: CesiumType.Viewer;
-	let viewerReady = false; // viewer の準備状態を追跡するフラグ
+	let cesium: typeof CesiumType = $state();
+	let viewer: CesiumType.Viewer = $state();
+	let viewerReady = $state(false); // viewer の準備状態を追跡するフラグ
+
+	// ポップアップの設定オプション - 最もシンプルな設定を使用
+	const popupOptions: EntityPopupOptions = {
+		enableHover: true,
+		// シンプルに固定サイズを指定
+		styleOptions: {
+			width: 400,
+			height: 200
+		}
+	};
 
 	onMount(async (): Promise<void> => {
 		if (!browser) return;
@@ -40,6 +51,7 @@
 
 			// CESIUM_BASE_URL の設定
 			const baseUrl = import.meta.env.DEV ? '/node_modules/cesium/Build/Cesium/' : '/Cesium/';
+			// @ts-expect-error - CesiumのためのグローバルCESIUM_BASE_URL設定
 			window.CESIUM_BASE_URL = baseUrl;
 
 			// Viewer の初期化（viewer 変数に代入）
@@ -83,8 +95,9 @@
 <!-- Cesium を描画するコンテナ -->
 <div id="cesiumContainer" class="h-full w-full"></div>
 
-<!-- viewerが準備できたらEntitiesコンポーネントを表示 -->
+<!-- viewerが準備できたらEntitiesコンポーネントとEntityPopupを表示 -->
 {#if viewerReady && viewer && cesium}
 	<Entities {viewer} {cesium} />
-	<EntityPopup {viewer} {cesium} />
+	<!-- ライブラリのEntityPopupコンポーネントを使用 -->
+	<EntityPopup {viewer} {cesium} options={popupOptions} />
 {/if}

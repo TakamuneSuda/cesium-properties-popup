@@ -1,9 +1,15 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import type * as CesiumType from 'cesium';
 
-	// Viewerとcesiumモジュールを親コンポーネントから受け取る
-	export let viewer: CesiumType.Viewer | undefined;
-	export let cesium: typeof CesiumType | undefined;
+	interface Props {
+		// Viewerとcesiumモジュールを親コンポーネントから受け取る
+		viewer: CesiumType.Viewer | undefined;
+		cesium: typeof CesiumType | undefined;
+	}
+
+	let { viewer, cesium }: Props = $props();
 
 	// 複数の地物を追加する関数
 	function addEntities(): void {
@@ -14,7 +20,7 @@
 
 		try {
 			// Cesiumのクラスを取得
-			const { Cartesian3, Color, VerticalOrigin, HorizontalOrigin } = cesium;
+			const { Cartesian3, Color, VerticalOrigin, HorizontalOrigin, JulianDate } = cesium;
 
 			// 地物1: 東京タワー
 			viewer.entities.add({
@@ -43,7 +49,9 @@
 					coordinates: '35.6586° N, 139.7454° E',
 					height: '333m',
 					opened: '1958年12月23日',
-					website: 'https://www.tokyotower.co.jp/'
+					website: 'https://www.tokyotower.co.jp/',
+					isLandmark: true, // 真偽値プロパティの例
+					visitorsPerYear: 4000000 // 数値プロパティの例
 				}
 			});
 
@@ -74,7 +82,16 @@
 					coordinates: '35.7101° N, 139.8107° E',
 					height: '634m',
 					opened: '2012年5月22日',
-					website: 'https://www.tokyo-skytree.jp/'
+					website: 'https://www.tokyo-skytree.jp/',
+					isLandmark: true,
+					visitorsPerYear: 6000000,
+					facilities: ['展望台', '商業施設', 'プラネタリウム', 'レストラン'], // 配列プロパティの例
+					openingHours: {
+						// オブジェクトプロパティの例
+						weekdays: '8:00-22:00',
+						weekends: '8:00-23:00',
+						holidays: '8:00-23:00'
+					}
 				}
 			});
 
@@ -105,7 +122,10 @@
 					coordinates: '35.6852° N, 139.7528° E',
 					area: '約115ヘクタール',
 					established: '1868年（明治元年）',
-					website: 'https://www.kunaicho.go.jp/event/kokyo-tours.html'
+					website: 'https://www.kunaicho.go.jp/event/kokyo-tours.html',
+					isLandmark: true,
+					accessibleAreas: ['皇居東御苑', '北の丸公園', '二重橋'],
+					lastRenovation: JulianDate.fromDate(new Date(2015, 0, 1)) // JulianDate型の例
 				}
 			});
 
@@ -138,19 +158,76 @@
 					opened: '1914年12月20日',
 					platforms: '28ホーム',
 					dailyPassengers: '約50万人（コロナ前）',
-					website: 'https://www.tokyoinfo.com/'
+					website: 'https://www.tokyoinfo.com/',
+					railwayLines: ['JR東日本', '東京メトロ', '都営地下鉄'],
+					facilities: ['東京駅一番街', '東京ステーションホテル', 'グランスタ', 'KITTEビル'],
+					renovationHistory: {
+						original: '1914年12月20日',
+						damaged: '1945年5月（第二次世界大戦）',
+						restored: '2012年10月1日（創建当時の姿に復元）'
+					}
 				}
 			});
 
-			console.log('4つのエンティティを追加しました');
+			// 地物5: 新宿御苑（ポリゴン地物の例）
+			viewer.entities.add({
+				id: 'shinjuku-gyoen',
+				name: '新宿御苑',
+				polygon: {
+					hierarchy: cesium.Cartesian3.fromDegreesArray([
+						139.708,
+						35.688, // 南西
+						139.717,
+						35.688, // 南東
+						139.717,
+						35.692, // 北東
+						139.708,
+						35.692 // 北西
+					]),
+					material: cesium.Color.GREEN.withAlpha(0.5),
+					heightReference: cesium.HeightReference.CLAMP_TO_GROUND
+				},
+				position: Cartesian3.fromDegrees(139.7125, 35.69, 0),
+				label: {
+					text: '新宿御苑',
+					font: '14pt sans-serif',
+					style: cesium.LabelStyle.FILL_AND_OUTLINE,
+					outlineWidth: 2,
+					verticalOrigin: VerticalOrigin.CENTER,
+					heightReference: cesium.HeightReference.RELATIVE_TO_GROUND
+				},
+				description: '東京都新宿区と渋谷区に跨る国民公園',
+				properties: {
+					address: '〒160-0014 東京都新宿区内藤町11',
+					area: '58.3ヘクタール',
+					established: '1906年（明治39年）',
+					entranceFee: {
+						adult: '500円',
+						child: '無料',
+						senior: '250円'
+					},
+					gardens: ['日本庭園', 'フランス式整形庭園', 'イギリス風景式庭園'],
+					openingHours: '9:00-16:00（入園は15:30まで）',
+					closedDays: '月曜日（祝日の場合は翌日）、年末年始',
+					coordinates: {
+						center: '35.6900° N, 139.7125° E',
+						bounds: '約1.5km×1km'
+					},
+					lastUpdated: new Date(2022, 3, 1).toISOString() // ISO日付文字列の例
+				}
+			});
+
+			console.log('5つのエンティティを追加しました');
 		} catch (error) {
 			console.error('エンティティの追加に失敗しました:', error);
 		}
 	}
 
 	// viewerとcesiumが設定されたら地物を追加
-	$: if (viewer && cesium) {
-		console.log('Entities: viewer と cesium が設定されました');
-		addEntities();
-	}
+	run(() => {
+		if (viewer && cesium) {
+			console.log('Entities: viewer と cesium が設定されました');
+			addEntities();
+		}
+	});
 </script>

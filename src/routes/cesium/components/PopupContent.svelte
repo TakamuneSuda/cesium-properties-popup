@@ -2,8 +2,12 @@
 	import type * as CesiumType from 'cesium';
 	import { formatPropertyValue, getPropertyEntries } from '../utils/entityHelpers';
 
-	export let entity: CesiumType.Entity | undefined;
-	export let cesium: typeof CesiumType | undefined;
+	interface Props {
+		entity: CesiumType.Entity | undefined;
+		cesium: typeof CesiumType | undefined;
+	}
+
+	let { entity, cesium }: Props = $props();
 </script>
 
 <div class="flex items-center justify-between border-b border-gray-300 bg-gray-100 p-2 px-3">

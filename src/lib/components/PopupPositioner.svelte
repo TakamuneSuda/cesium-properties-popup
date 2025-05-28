@@ -6,16 +6,18 @@
 	import { throttle } from '../utils/throttle';
 	import { calculatePopupPosition } from '../utils/popupPositioning';
 	import { POPUP_SETTINGS } from '../utils/popupSettings';
+	import type { EntityPopupOptions } from '../types';
 
 	interface Props {
 		viewer: CesiumType.Viewer | undefined;
 		cesium: typeof CesiumType | undefined;
 		entity: CesiumType.Entity | undefined;
 		isPopupOpen: boolean;
+		options?: EntityPopupOptions;
 		children?: import('svelte').Snippet;
 	}
 
-	let { viewer, cesium, entity, isPopupOpen, children }: Props = $props();
+	let { viewer, cesium, entity, isPopupOpen, options = {}, children }: Props = $props();
 
 	let popupPosition = $state({ x: 0, y: 0 });
 	let cameraChangedCallback: (() => void) | undefined;
@@ -167,8 +169,13 @@
 
 {#if isPositionCalculated}
 	<div
-		class="z-[1000] -mt-2.5 max-h-[400px] max-w-[400px] min-w-[250px] -translate-x-1/2 -translate-y-full overflow-auto rounded border-l-3 border-blue-500 bg-white/95 antialiased opacity-90 shadow-lg will-change-transform"
-		style="position: absolute; left: {popupPosition.x}px; top: {popupPosition.y}px; transition: transform 0.15s ease-out, left 0.15s ease-out, top 0.15s ease-out; transform: translate3d(0, 0, 0);"
+		class={`z-[1000] -translate-x-1/2 -translate-y-full overflow-auto bg-white shadow ${options.styleOptions?.popupClass || ''}`}
+		style="position: absolute; 
+			left: {popupPosition.x}px; 
+			top: {popupPosition.y}px; 
+			transition: left 0.1s ease-out, top 0.1s ease-out; 
+			height: {options.styleOptions?.height || 250}px;
+			width: {options.styleOptions?.width || 300}px;"
 		data-entity-id={entity?.id}
 	>
 		{@render children?.()}
