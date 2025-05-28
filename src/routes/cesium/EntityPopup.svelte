@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { run } from 'svelte/legacy';
-
-	import { onMount, onDestroy } from 'svelte';
 	import type * as CesiumType from 'cesium';
 	import PopupPositioner from './components/PopupPositioner.svelte';
 	import PopupContent from './components/PopupContent.svelte';
@@ -9,111 +6,97 @@
 	interface Props {
 		viewer: CesiumType.Viewer | undefined;
 		cesium: typeof CesiumType | undefined;
-		// ホバー機能の設定オプション
-		enableHover?: boolean; // ホバーでポップアップを表示するかどうか
+		enableHover?: boolean;
 	}
 
 	let { viewer, cesium, enableHover = true }: Props = $props();
 
 	let selectedEntity: CesiumType.Entity | undefined = $state(undefined);
 	let isPopupOpen = $state(false);
-	let eventHandler: CesiumType.ScreenSpaceEventHandler | undefined = $state();
+	// eventHandler を $state から通常の let 変数に変更
+	let currentEventHandler: CesiumType.ScreenSpaceEventHandler | undefined = undefined;
 
-	// ポップアップの表示モード（hover: ホバー時のみ表示, click: クリック時に固定表示）
 	let displayMode: 'hover' | 'click' = 'hover';
+	let isProcessingClick = false;
+	let clickCooldown = 1000; // ミリ秒
 
-	// クリック処理中かどうかのフラグと制御用変数
-	let isProcessingClick = false; // クリック処理中かどうか
-	let clickCooldown = 1000; // クリック後のホバー制限時間（ミリ秒）
+	$effect(() => {
+		// この effect は viewer, cesium, enableHover に依存します。
+		// Svelte がこれらの読み取りを検出し、変更時に effect を再実行します。
 
-	onMount(() => {
-		setupEventHandler();
-	});
-
-	onDestroy(() => {
-		removeEventHandler();
-	});
-
-	function setupEventHandler() {
-		if (!viewer || !cesium) return;
-
-		// イベントハンドラーが既に存在する場合は破棄
-		removeEventHandler();
-
-		// 新しいイベントハンドラーを作成
-		eventHandler = new cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-
-		// 左クリックイベントを監視
-		eventHandler.setInputAction((click: CesiumType.ScreenSpaceEventHandler.PositionedEvent) => {
-			const pickedObject = viewer.scene.pick(click.position);
-
-			// エンティティがクリックされた場合
-			if (cesium.defined(pickedObject) && pickedObject.id instanceof cesium.Entity) {
-				// クリック処理フラグをON
-				isProcessingClick = true;
-
-				selectedEntity = pickedObject.id;
-				// ポップアップの表示モードをクリックに設定
-				displayMode = 'click';
-				isPopupOpen = true;
-
-				// クリック処理のクールダウン期間を設定
-				setTimeout(() => {
-					isProcessingClick = false;
-					// クリックモードは継続（displayModeはそのまま）
-				}, clickCooldown);
-			} else {
-				// 何もクリックされなかった場合はポップアップを閉じる
-				displayMode = 'hover'; // モードをホバーに戻す
-				closePopup();
+		// 既存のイベントハンドラをクリーンアップする内部関数
+		const cleanupEventHandler = () => {
+			if (currentEventHandler) {
+				currentEventHandler.destroy();
+				currentEventHandler = undefined;
 			}
-		}, cesium.ScreenSpaceEventType.LEFT_CLICK);
+		};
 
-		// ホバーイベントを追加（設定で有効な場合のみ）
-		if (enableHover) {
-			eventHandler.setInputAction((movement: CesiumType.ScreenSpaceEventHandler.MotionEvent) => {
-				// クリック処理中はホバー処理をスキップ
-				if (isProcessingClick) {
-					return;
-				}
+		// effect が再実行される前に、まず既存のハンドラをクリーンアップ
+		cleanupEventHandler();
 
-				// クリックモードの場合は、何もホバーされていなくてもポップアップを閉じない
-				if (displayMode === 'click') {
-					return;
-				}
+		if (viewer && cesium) {
+			currentEventHandler = new cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
 
-				const pickedObject = viewer.scene.pick(movement.endPosition);
+			// 左クリックイベントを監視
+			currentEventHandler.setInputAction(
+				(click: CesiumType.ScreenSpaceEventHandler.PositionedEvent) => {
+					const pickedObject = viewer.scene.pick(click.position);
 
-				// エンティティがホバーされた場合（ホバーモードの時のみ処理）
-				if (cesium.defined(pickedObject) && pickedObject.id instanceof cesium.Entity) {
-					selectedEntity = pickedObject.id;
+					if (cesium.defined(pickedObject) && pickedObject.id instanceof cesium.Entity) {
+						isProcessingClick = true;
+						selectedEntity = pickedObject.id;
+						displayMode = 'click';
+						isPopupOpen = true;
 
-					// ポップアップを表示
-					isPopupOpen = true;
-				} else if (!cesium.defined(pickedObject)) {
-					// ホバーモードの時のみ、何もホバーされていない場合はポップアップを閉じる
-					closePopup();
-				}
-			}, cesium.ScreenSpaceEventType.MOUSE_MOVE);
+						setTimeout(() => {
+							isProcessingClick = false;
+						}, clickCooldown);
+					} else {
+						displayMode = 'hover';
+						closePopup();
+					}
+				},
+				cesium.ScreenSpaceEventType.LEFT_CLICK
+			);
+
+			// ホバーイベントを追加（enableHover が true の場合のみ）
+			if (enableHover) {
+				currentEventHandler.setInputAction(
+					(movement: CesiumType.ScreenSpaceEventHandler.MotionEvent) => {
+						if (isProcessingClick || displayMode === 'click') {
+							return;
+						}
+
+						const pickedObject = viewer.scene.pick(movement.endPosition);
+
+						if (cesium.defined(pickedObject) && pickedObject.id instanceof cesium.Entity) {
+							selectedEntity = pickedObject.id;
+							isPopupOpen = true;
+						} else if (!cesium.defined(pickedObject)) {
+							closePopup();
+						}
+					},
+					cesium.ScreenSpaceEventType.MOUSE_MOVE
+				);
+			}
+
+			// この effect インスタンスのクリーンアップ関数
+			return cleanupEventHandler;
+		} else {
+			// viewer または cesium が利用できない場合、既存のハンドラは既にクリーンアップされているはず。
+			// 何も設定されなかったので、空のクリーンアップ関数を返す。
+			return () => {};
 		}
-	}
-
-	function removeEventHandler() {
-		if (eventHandler) {
-			eventHandler.destroy();
-			eventHandler = undefined;
-		}
-	}
+	});
 
 	function closePopup() {
 		isPopupOpen = false;
 		selectedEntity = undefined;
+		// displayMode は LEFT_CLICK のelse節で 'hover' に戻されるため、
+		// ここで明示的に displayMode を変更する必要は、現在のロジックではなさそう。
+		// もし必要なら displayMode = 'hover'; を追加。
 	}
-	run(() => {
-		if (viewer && cesium && !eventHandler) {
-			setupEventHandler();
-		}
-	});
 </script>
 
 {#if isPopupOpen && selectedEntity}

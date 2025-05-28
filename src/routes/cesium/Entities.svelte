@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from 'svelte/legacy';
-
 	import type * as CesiumType from 'cesium';
 
 	interface Props {
@@ -224,10 +222,14 @@
 	}
 
 	// viewerとcesiumが設定されたら地物を追加
-	run(() => {
+	$effect(() => {
 		if (viewer && cesium) {
-			console.log('Entities: viewer と cesium が設定されました');
+			console.log('Entities: viewer と cesium が設定されました (using $effect)');
 			addEntities();
+			// この$effectはエンティティを追加するだけなので、通常クリーンアップは不要です。
+			// エンティティはviewerインスタンスに属し、コンポーネントが破棄されてもviewerが存続する限り残ります。
+			// もしこのコンポーネントが破棄される際にエンティティを削除する必要がある場合は、
+			// return () => { /* remove entities logic */ }; のようにクリーンアップ関数を定義します。
 		}
 	});
 </script>
