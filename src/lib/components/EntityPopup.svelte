@@ -12,13 +12,6 @@
 
 	let { viewer, cesium, options = {} }: Props = $props();
 
-	// オプションからデフォルト値を設定
-	// options が変更されると、この $effect も再実行されるべきなので、
-	// enableHover のような options から派生する値は $effect 内で読み込むか、
-	// $derived を使うなどしてリアクティブにする必要があります。
-	// この例では、$effect が options を暗黙的に依存関係として捉えることを期待します。
-	// Svelte 5 では、$effect内で options.enableHover を直接読むことで options が依存関係になります。
-
 	let selectedEntity: CesiumType.Entity | undefined = $state(undefined);
 	let isPopupOpen = $state(false);
 	// eventHandler を $state から通常の let 変数に変更
@@ -28,12 +21,11 @@
 	let isProcessingClick = false;
 
 	$effect(() => {
-		// options.enableHover を $effect 内で参照することで、options が変更された場合にも
-		// この $effect が再実行されるようになります。
+		// options から設定値を取得し、デフォルト値を設定
 		const enableHoverEffect = options.enableHover ?? true;
 		const clickCooldownEffect = options.clickCooldown ?? 1000;
 
-		// 既存のイベントハンドラをクリーンアップする関数
+		// 既存のイベントハンドラをクリーンアップする内部関数
 		const cleanupEventHandler = () => {
 			if (currentEventHandler) {
 				currentEventHandler.destroy();
@@ -41,13 +33,13 @@
 			}
 		};
 
-		if (viewer && cesium) {
-			// まず既存のハンドラをクリーンアップ
-			cleanupEventHandler();
+		// effect が再実行される前に、まず既存のハンドラをクリーンアップ
+		cleanupEventHandler();
 
-			// 新しいイベントハンドラを作成
+		if (viewer && cesium) {
 			currentEventHandler = new cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
 
+			// 左クリックイベントを監視
 			currentEventHandler.setInputAction(
 				(click: CesiumType.ScreenSpaceEventHandler.PositionedEvent) => {
 					const pickedObject = viewer.scene.pick(click.position);
@@ -60,7 +52,7 @@
 
 						setTimeout(() => {
 							isProcessingClick = false;
-						}, clickCooldownEffect); // optionsから派生した値を使用
+						}, clickCooldownEffect); // options から取得したクールダウン時間を使用
 					} else {
 						displayMode = 'hover';
 						closePopup();
@@ -69,8 +61,8 @@
 				cesium.ScreenSpaceEventType.LEFT_CLICK
 			);
 
+			// ホバーイベントを追加（enableHover が true の場合のみ）
 			if (enableHoverEffect) {
-				// optionsから派生した値を使用
 				currentEventHandler.setInputAction(
 					(movement: CesiumType.ScreenSpaceEventHandler.MotionEvent) => {
 						if (isProcessingClick || displayMode === 'click') {
@@ -90,19 +82,20 @@
 				);
 			}
 
-			// この $effect のクリーンアップ関数
-			return () => {
-				cleanupEventHandler();
-			};
+			// この effect インスタンスのクリーンアップ関数
+			return cleanupEventHandler;
 		} else {
-			// viewer または cesium が利用できない場合は、既存のハンドラをクリーンアップ
-			cleanupEventHandler();
+			// viewer または cesium が利用できない場合、既存のハンドラは既にクリーンアップされているはず。
+			// 何も設定されなかったので、空のクリーンアップ関数を返す。
+			return () => {};
 		}
 	});
 
 	function closePopup() {
 		isPopupOpen = false;
 		selectedEntity = undefined;
+		// displayMode は LEFT_CLICK のelse節で 'hover' に戻されるため、
+		// ここで明示的に displayMode を変更する必要は、現在のロジックではなさそう。
 	}
 </script>
 

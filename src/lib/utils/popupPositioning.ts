@@ -50,13 +50,29 @@ export async function calculatePopupPosition(
 				try {
 					// 地形の高さを取得するためのサンプリング
 					const terrainSamplePositions = [cartographic];
-					const updatedPositions = await cesium.sampleTerrainMostDetailed(
-						viewer.terrainProvider,
-						terrainSamplePositions
-					);
-
-					// 地形高さを取得
-					terrainHeight = updatedPositions[0].height || 0;
+					// まずは詳細な地形情報を試す
+					try {
+						const updatedPositions = await cesium.sampleTerrainMostDetailed(
+							viewer.terrainProvider,
+							terrainSamplePositions
+						);
+						// 地形高さを取得
+						terrainHeight = updatedPositions[0].height || 0;
+					} catch (detailedError) {
+						// 詳細な方法が失敗したら、より単純な方法を試す
+						console.warn('詳細な地形取得に失敗、標準方法で再試行します:', detailedError);
+						try {
+							// 地形の標高を取得（レベル9 - より安定した計算）
+							const level9Positions = await cesium.sampleTerrain(
+								viewer.terrainProvider,
+								9, // より安定したレベル
+								terrainSamplePositions
+							);
+							terrainHeight = level9Positions[0].height || 0;
+						} catch (simpleError) {
+							console.warn('地形取得に失敗:', simpleError);
+						}
+					}
 
 					// キャッシュに保存
 					terrainHeightCache.set(entityId, terrainHeight);
@@ -65,8 +81,10 @@ export async function calculatePopupPosition(
 				}
 			}
 
-			// 元の位置より地形高さの方が高い場合は地形高さを使用
-			cartographic.height = Math.max(cartographic.height, terrainHeight);
+			// エンティティが地表より下にある場合は地表の高さを使用
+			if (cartographic.height < terrainHeight) {
+				cartographic.height = terrainHeight;
+			}
 		}
 
 		// 更新されたCartographicをCartesianに戻す
@@ -75,14 +93,21 @@ export async function calculatePopupPosition(
 		// カメラからの距離に応じてオフセットを動的に調整
 		const cameraDistance = cesium.Cartesian3.distance(viewer.camera.position, positionWithTerrain);
 
-		// 距離に応じたスケール係数
-		// より適切なスケーリング - 近すぎず、遠すぎない適切なオフセット
-		const offsetScale = Math.max(cameraDistance * 0.04, 10); // 最小10m、距離の4%
+		// 距離に応じたスケール係数の計算を改良
+		// 1. 近距離では大きめのオフセットを使用（より見やすく）
+		// 2. 中・遠距離では距離に比例したオフセット
+		// 3. オフセットに上限を設ける（遠すぎる場合に巨大なオフセットを防止）
+		const minOffset = 15; // 最小オフセット（メートル）
+		const maxOffset = 500; // 最大オフセット（メートル）
+		const distanceFactor = 0.05; // 距離の5%（より大きめのオフセット）
 
-		// オフセット位置を計算（地物の上方に表示）
+		// オフセット計算: 最小値と最大値の間に収まるよう制限
+		const offsetScale = Math.min(Math.max(cameraDistance * distanceFactor, minOffset), maxOffset);
+
+		// オフセット位置を計算（地物の上方に表示）- 調整済みオフセットを使用
 		const offsetPosition = cesium.Cartesian3.add(
 			positionWithTerrain,
-			new cesium.Cartesian3(0, 0, offsetScale), // 動的なZ方向オフセット
+			new cesium.Cartesian3(0, 0, offsetScale),
 			new cesium.Cartesian3()
 		);
 

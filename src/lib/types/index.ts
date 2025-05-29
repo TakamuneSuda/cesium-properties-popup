@@ -26,6 +26,12 @@ export interface EntityPopupOptions {
 
 		/** ポップアップのCSSクラス */
 		popupClass?: string;
+
+		/** ポップアップの背景色（CSS値） */
+		backgroundColor?: string;
+
+		/** ポップアップの縦方向のオーバーフロー（CSS値） */
+		overflowY?: string;
 	};
 }
 
@@ -66,4 +72,34 @@ export interface EntityPositionStrategy {
 
 	// オプショナルのメソッド
 	updateTerrainHeight?: (entity: Cesium.Entity, scene: Cesium.Scene) => Promise<void>;
+}
+
+/**
+ * PopupPositionerコンポーネントのProps
+ */
+export interface PopupPositionerProps {
+	viewer: Cesium.Viewer | undefined;
+	cesium: typeof Cesium | undefined;
+	entity: Cesium.Entity | undefined;
+	isPopupOpen: boolean;
+	options?: EntityPopupOptions;
+	children?: import('svelte').Snippet;
+}
+
+/**
+ * EntityPopupコンポーネントのProps
+ */
+export interface EntityPopupProps {
+	viewer: Cesium.Viewer;
+	cesium: typeof Cesium;
+	options?: EntityPopupOptions;
+}
+
+/**
+ * PopupContentコンポーネントのProps
+ */
+export interface PopupContentProps {
+	entity: Cesium.Entity | undefined;
+	cesium: typeof Cesium | undefined;
+	customRenderer?: import('svelte').Snippet;
 }

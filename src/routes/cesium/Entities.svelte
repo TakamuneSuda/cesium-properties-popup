@@ -215,7 +215,6 @@
 				}
 			});
 
-			console.log('5つのエンティティを追加しました');
 		} catch (error) {
 			console.error('エンティティの追加に失敗しました:', error);
 		}
@@ -224,7 +223,6 @@
 	// viewerとcesiumが設定されたら地物を追加
 	$effect(() => {
 		if (viewer && cesium) {
-			console.log('Entities: viewer と cesium が設定されました (using $effect)');
 			addEntities();
 			// この$effectはエンティティを追加するだけなので、通常クリーンアップは不要です。
 			// エンティティはviewerインスタンスに属し、コンポーネントが破棄されてもviewerが存続する限り残ります。

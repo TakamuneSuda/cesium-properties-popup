@@ -3,10 +3,17 @@
  * パラメータの調整やチューニングを容易にするために分離
  */
 export const POPUP_SETTINGS = {
+	// デフォルトのスタイル設定
+	defaultStyles: {
+		width: 400,
+		height: 300,
+		backgroundColor: 'rgba(255, 255, 255, 0.95)',
+		overflowY: 'auto'
+	},
 	// 位置計算の設定
 	positioning: {
 		// スムージング係数 (0-1: 1に近いほど前回位置の影響が強くなる)
-		smoothingFactor: 0.85,
+		smoothingFactor: 0.75, // やや小さくして反応速度を向上
 		// フィルタリング設定
 		thresholds: {
 			// 1次フィルター (entityHelpers.ts)

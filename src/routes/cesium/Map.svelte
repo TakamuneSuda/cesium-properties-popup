@@ -4,7 +4,7 @@
 	import { CESIUM_INITIAL_OPTIONS } from './cesiumUtil';
 	import type * as CesiumType from 'cesium';
 	import Entities from './Entities.svelte';
-	// ライブラリからEntityPopupをインポート
+	// ライブラリからEntityPopupとバージョン情報をインポート
 	import { EntityPopup, type EntityPopupOptions } from '$lib';
 
 	// Cesium モジュールは動的インポートするので、型は import 型を利用
@@ -12,14 +12,10 @@
 	let viewer: CesiumType.Viewer = $state();
 	let viewerReady = $state(false); // viewer の準備状態を追跡するフラグ
 
-	// ポップアップの設定オプション - 最もシンプルな設定を使用
+	// ポップアップの設定オプション - デフォルトスタイルを使用
 	const popupOptions: EntityPopupOptions = {
-		enableHover: true,
-		// シンプルに固定サイズを指定
-		styleOptions: {
-			width: 400,
-			height: 200
-		}
+		enableHover: true
+		// styleOptionsは指定せず、ライブラリのデフォルト設定を使用
 	};
 
 	onMount(async (): Promise<void> => {

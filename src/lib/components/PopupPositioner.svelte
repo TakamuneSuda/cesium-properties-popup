@@ -3,18 +3,18 @@
 	import { throttle } from '../utils/throttle';
 	import { calculatePopupPosition } from '../utils/popupPositioning';
 	import { POPUP_SETTINGS } from '../utils/popupSettings';
-	import type { EntityPopupOptions } from '../types';
+	import type { EntityPopupOptions, PopupPositionerProps } from '../types';
 
-	interface Props {
-		viewer: CesiumType.Viewer | undefined;
-		cesium: typeof CesiumType | undefined;
-		entity: CesiumType.Entity | undefined;
-		isPopupOpen: boolean;
-		options?: EntityPopupOptions;
-		children?: import('svelte').Snippet;
-	}
-
-	let { viewer, cesium, entity, isPopupOpen, options = {}, children }: Props = $props();
+	// Props と デフォルト設定のマージ
+	let props = $props<PopupPositionerProps>();
+	let { viewer, cesium, entity, isPopupOpen, children } = props;
+	let options = {
+		...props.options,
+		styleOptions: {
+			...POPUP_SETTINGS.defaultStyles, // デフォルトスタイル
+			...(props.options?.styleOptions || {}) // ユーザー設定で上書き
+		}
+	};
 
 	let popupPosition = $state({ x: 0, y: 0 });
 	let isPositionCalculated = $state(false);
@@ -139,15 +139,61 @@
 
 {#if isPositionCalculated}
 	<div
-		class={`z-[1000] -translate-x-1/2 -translate-y-full overflow-auto bg-white shadow ${options.styleOptions?.popupClass || ''}`}
-		style="position: absolute; 
+		class="cesium-entity-popup {options.styleOptions?.popupClass || ''}"
+		style="
+			position: absolute; 
 			left: {popupPosition.x}px; 
 			top: {popupPosition.y}px; 
-			transition: left 0.1s ease-out, top 0.1s ease-out; 
-			height: {options.styleOptions?.height || 250}px;
-			width: {options.styleOptions?.width || 300}px;"
+			transition: transform 0.15s ease-out, left 0.15s ease-out, top 0.15s ease-out; 
+			{options.styleOptions?.height ? `height: ${options.styleOptions.height}px;` : ''}
+			{options.styleOptions?.width ? `width: ${options.styleOptions.width}px;` : ''}
+			{options.styleOptions?.backgroundColor
+			? `background-color: ${options.styleOptions.backgroundColor};`
+			: ''}
+			{options.styleOptions?.overflowY ? `overflow-y: ${options.styleOptions.overflowY};` : ''}"
 		data-entity-id={entity?.id}
 	>
 		{@render children?.()}
 	</div>
 {/if}
+
+<style>
+	/* ポップアップの基本スタイル */
+	.cesium-entity-popup {
+		/* 表示レイヤー制御 */
+		z-index: 1000;
+		position: relative;
+
+		/* 位置調整 - エンティティの位置から上にシフトした基準点 */
+		margin-top: -0.625rem;
+		transform: translateX(-50%) translateY(-100%);
+
+		/* サイズ制限 */
+		max-height: 400px;
+		max-width: 400px;
+		min-width: 250px;
+
+		/* スクロール設定 - コンテンツがあふれた場合の対応 */
+		overflow: auto;
+
+		/* 視覚的スタイル */
+		border-radius: 0.375rem; /* より丸みのある角 */
+		border-left: 3px solid #3b82f6; /* アクセントの青いボーダー */
+		background-color: rgba(255, 255, 255, 0.95);
+		font-family:
+			system-ui,
+			-apple-system,
+			sans-serif;
+		font-smooth: antialiased;
+		opacity: 0.95; /* より高い不透明度で読みやすく */
+
+		/* シャドウ効果 - よりシャープで現代的 */
+		box-shadow:
+			0 10px 20px -5px rgba(0, 0, 0, 0.15),
+			0 4px 8px -2px rgba(0, 0, 0, 0.1),
+			0 0 0 1px rgba(0, 0, 0, 0.05);
+
+		/* アニメーションとパフォーマンス最適化 */
+		will-change: transform;
+	}
+</style>

@@ -1,6 +1,7 @@
 /**
  * Cesium Properties Popup ライブラリ
  * Cesiumのエンティティにホバーまたはクリックでプロパティを表示するコンポーネント
+ * 2025-05-29: 統合作業後に再定義
  */
 
 // コアコンポーネントのエクスポート
@@ -23,3 +24,9 @@ export {
 } from './utils/entityHelpers';
 export { calculatePopupPosition } from './utils/popupPositioning';
 export { throttle } from './utils/throttle';
+
+// エンティティポジション戦略のエクスポート
+export { entityPositionStrategies } from './utils/entityPositionStrategies';
+
+// 再エクスポートを確実にするためのダミー変数
+export const LIBRARY_VERSION = '1.0.0-integrated';

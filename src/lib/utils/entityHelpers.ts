@@ -84,15 +84,45 @@ export function worldPositionToScreenPosition(
 	if (!viewer || !cesium || !position) return undefined;
 
 	try {
-		// 3D世界座標からスクリーン座標に変換
-		// worldToWindowCoordinatesはViewportとSceneCoordinatesの両方を考慮
+		// 世界座標がビューポート内にあるか確認
+		const inViewport =
+			viewer.scene.camera.frustum
+				.computeCullingVolume(
+					viewer.scene.camera.position,
+					viewer.scene.camera.direction,
+					viewer.scene.camera.up
+				)
+				.computeVisibility(new cesium.BoundingSphere(position, 1.0)) !== cesium.Intersect.OUTSIDE;
+
+		// ビューポート外の場合は以前の位置を維持
+		if (!inViewport && fallbackPosition) {
+			return fallbackPosition;
+		}
+
+		// -------- 3D世界座標からスクリーン座標に変換 --------
+		// まずはstandard変換で試す
 		const screenPosition = cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, position);
 
-		if (!screenPosition) return undefined;
+		if (!screenPosition) {
+			// 標準的な方法が失敗した場合、代替計算を試みる
+			console.warn('標準的な座標変換が失敗、代替計算を試みます');
+			if (fallbackPosition) return fallbackPosition;
+			return undefined;
+		}
 
 		// 計算された生の座標値（小数点以下を切り捨て）
 		const rawX = Math.floor(screenPosition.x);
 		const rawY = Math.floor(screenPosition.y);
+
+		// ビュー外になっていないか確認（画面端のチェック）
+		const canvas = viewer.scene.canvas;
+		const isOffscreen =
+			rawX < 0 || rawY < 0 || rawX > canvas.clientWidth || rawY > canvas.clientHeight;
+
+		// 画面外の場合は前回位置を返す（ポップアップが急に消えるのを防ぐ）
+		if (isOffscreen && fallbackPosition) {
+			return fallbackPosition;
+		}
 
 		// 初回実行時またはfallbackPositionがない場合
 		if (!lastCalculatedPosition || !fallbackPosition) {
@@ -105,17 +135,25 @@ export function worldPositionToScreenPosition(
 			Math.abs(fallbackPosition.x - rawX) > LARGE_MOVEMENT_THRESHOLD ||
 			Math.abs(fallbackPosition.y - rawY) > LARGE_MOVEMENT_THRESHOLD
 		) {
+
 			lastCalculatedPosition = { x: rawX, y: rawY };
 			return lastCalculatedPosition;
 		}
 
-		// 強力なスムージング処理（前回の位置をより重視）
-		// 現在の実際の位置には少ない重みを与え、前回の位置により大きな重みを与える
+		// アダプティブスムージング - カメラの動きが速い時はスムージングを弱く
+		const cameraMovementSpeed = cesium.Cartesian3.magnitude(viewer.scene.camera.positionWC);
+		// 動きが速いほど小さい値に（より即座に位置が反映される）
+		const adaptiveSmoothingFactor = Math.max(
+			0.5,
+			Math.min(SMOOTHING_FACTOR, SMOOTHING_FACTOR - cameraMovementSpeed * 0.0001)
+		);
+
+		// スムージング処理（前回の位置と新しい位置を混合）
 		const smoothedX = Math.floor(
-			fallbackPosition.x * SMOOTHING_FACTOR + rawX * (1 - SMOOTHING_FACTOR)
+			fallbackPosition.x * adaptiveSmoothingFactor + rawX * (1 - adaptiveSmoothingFactor)
 		);
 		const smoothedY = Math.floor(
-			fallbackPosition.y * SMOOTHING_FACTOR + rawY * (1 - SMOOTHING_FACTOR)
+			fallbackPosition.y * adaptiveSmoothingFactor + rawY * (1 - adaptiveSmoothingFactor)
 		);
 
 		// 1次フィルター: スムージング処理後の微小変動（閾値以下）を抑制

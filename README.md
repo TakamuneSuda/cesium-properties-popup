@@ -31,7 +31,7 @@ yarn add cesium-properties-popup
 
 ```svelte
 <script lang="ts">
-	import { EntityPopup } from 'cesium-properties-popup';
+	import { EntityPopup, LIBRARY_VERSION } from 'cesium-properties-popup';
 	import type * as CesiumType from 'cesium';
 
 	let viewer: CesiumType.Viewer;
@@ -45,6 +45,19 @@ yarn add cesium-properties-popup
 
 <!-- 最もシンプルな使用方法 -->
 <EntityPopup {viewer} {cesium} />
+```
+
+## 開発環境のセットアップ
+
+開発やデバッグ中にキャッシュによる問題が発生した場合は、以下のコマンドでキャッシュをクリアして再ビルドできます：
+
+```bash
+# キャッシュクリア＆再ビルド
+npm run rebuild
+
+# または個別に実行
+npm run clean   # .svelte-kitとnode_modules/.viteのキャッシュをクリア
+npm run build   # ライブラリを再ビルド
 ```
 
 ## カスタマイズオプション
