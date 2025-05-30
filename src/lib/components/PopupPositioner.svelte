@@ -5,35 +5,22 @@
 
 	import type { PopupPositionerProps } from '../types';
 
-	const props = $props<PopupPositionerProps>();
+	let {
+		viewer,
+		cesium,
+		entity,
+		isPopupOpen,
+		children,
+		options = {}
+	}: PopupPositionerProps = $props();
 
-	let viewer = $state(props.viewer);
-	let cesium = $state(props.cesium);
-	let entity = $state(props.entity);
-	let isPopupOpen = $state(props.isPopupOpen);
-	let children = $state(props.children);
-	let options = $state({
-		...props.options,
+	// Compute derived options with defaults
+	let computedOptions = $derived({
+		...options,
 		styleOptions: {
 			...POPUP_SETTINGS.defaultStyles,
-			...(props.options?.styleOptions || {})
+			...(options?.styleOptions || {})
 		}
-	});
-
-	// プロパティの変更を監視して状態を更新
-	$effect(() => {
-		viewer = props.viewer;
-		cesium = props.cesium;
-		entity = props.entity;
-		isPopupOpen = props.isPopupOpen;
-		children = props.children;
-		options = {
-			...props.options,
-			styleOptions: {
-				...POPUP_SETTINGS.defaultStyles,
-				...(props.options?.styleOptions || {})
-			}
-		};
 	});
 
 	let popupPosition = $state({ x: 0, y: 0 });
@@ -91,8 +78,11 @@
 				}
 			}, POPUP_SETTINGS.updateFrequency.cameraChangeThrottle);
 			viewer.camera.changed.addEventListener(throttledCameraUpdate);
-			cleanupCameraChangeListener = () =>
-				viewer.camera.changed.removeEventListener(throttledCameraUpdate);
+			cleanupCameraChangeListener = () => {
+				if (viewer) {
+					viewer.camera.changed.removeEventListener(throttledCameraUpdate);
+				}
+			};
 
 			// --- PreRender Listener ---
 			const throttledRenderUpdate = throttle(() => {
@@ -162,18 +152,20 @@
 
 {#if isPositionCalculated}
 	<div
-		class="cesium-entity-popup {options.styleOptions?.popupClass || ''}"
+		class="cesium-entity-popup {computedOptions.styleOptions?.popupClass || ''}"
 		style="
 			position: absolute; 
 			left: {popupPosition.x}px; 
 			top: {popupPosition.y}px; 
 			transition: transform 0.15s ease-out, left 0.15s ease-out, top 0.15s ease-out; 
-			{options.styleOptions?.height ? `height: ${options.styleOptions.height}px;` : ''}
-			{options.styleOptions?.width ? `width: ${options.styleOptions.width}px;` : ''}
-			{options.styleOptions?.backgroundColor
-			? `background-color: ${options.styleOptions.backgroundColor};`
+			{computedOptions.styleOptions?.height ? `height: ${computedOptions.styleOptions.height}px;` : ''}
+			{computedOptions.styleOptions?.width ? `width: ${computedOptions.styleOptions.width}px;` : ''}
+			{computedOptions.styleOptions?.backgroundColor
+			? `background-color: ${computedOptions.styleOptions.backgroundColor};`
 			: ''}
-			{options.styleOptions?.overflowY ? `overflow-y: ${options.styleOptions.overflowY};` : ''}"
+			{computedOptions.styleOptions?.overflowY
+			? `overflow-y: ${computedOptions.styleOptions.overflowY};`
+			: ''}"
 		data-entity-id={entity?.id}
 	>
 		{@render children?.()}

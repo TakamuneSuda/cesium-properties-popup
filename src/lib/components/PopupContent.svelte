@@ -1,13 +1,9 @@
 <script lang="ts">
 	import { formatPropertyValue, getPropertyEntries } from '../utils/entityHelpers';
-	import type { EntityPopupOptions, PopupContentProps } from '../types';
+	import type { PopupContentProps } from '../types';
 
 	// Add optional parameters from PopupContentProps
-	let {
-		entity,
-		cesium,
-		options = {}
-	}: PopupContentProps & { options?: EntityPopupOptions } = $props();
+	let { entity, cesium, options = {} }: PopupContentProps = $props();
 
 	// Function to filter properties
 	function filterProperty(name: string, value: unknown): boolean {
@@ -65,18 +61,5 @@
 		padding: 0.25rem 0.5rem;
 		font-size: 0.875rem;
 		word-break: break-word;
-	}
-
-	.popup-pointer {
-		position: absolute;
-		bottom: -0.5rem;
-		left: 50%;
-		height: 0;
-		width: 0;
-		transform: translateX(-50%);
-		border-top: 0.5rem solid rgba(255, 255, 255, 0.95);
-		border-right: 0.5rem solid transparent;
-		border-left: 0.5rem solid transparent;
-		filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.05));
 	}
 </style>

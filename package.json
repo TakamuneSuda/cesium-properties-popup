@@ -11,7 +11,7 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/takamunesuda/cesium-properties-popup"
+		"url": "https://github.com/takamunesuda/cesium-properties-popup.git"
 	},
 	"author": "takamunesuda (https://x.com/STakamu2532)",
 	"scripts": {

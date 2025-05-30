@@ -22,7 +22,6 @@
 
 			// Get necessary exports from Cesium module
 			const {
-				Ion,
 				UrlTemplateImageryProvider,
 				Viewer: CesiumViewer,
 				Cartesian3,

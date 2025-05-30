@@ -2,15 +2,9 @@
 	import type * as CesiumType from 'cesium';
 	import PopupPositioner from './PopupPositioner.svelte';
 	import PopupContent from './PopupContent.svelte';
-	import type { EntityPopupOptions } from '../types';
+	import type { EntityPopupProps } from '../types';
 
-	interface Props {
-		viewer: CesiumType.Viewer | undefined;
-		cesium: typeof CesiumType | undefined;
-		options?: EntityPopupOptions;
-	}
-
-	let { viewer, cesium, options = {} }: Props = $props();
+	let { viewer, cesium, options = {} }: EntityPopupProps = $props();
 
 	let selectedEntity: CesiumType.Entity | undefined = $state(undefined);
 	let isPopupOpen = $state(false);

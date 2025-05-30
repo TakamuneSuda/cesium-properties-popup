@@ -87,8 +87,8 @@ export interface PopupPositionerProps {
  * EntityPopupコンポーネントのProps
  */
 export interface EntityPopupProps {
-	viewer: Cesium.Viewer;
-	cesium: typeof Cesium;
+	viewer: Cesium.Viewer | undefined;
+	cesium: typeof Cesium | undefined;
 	options?: EntityPopupOptions;
 }
 
@@ -98,5 +98,6 @@ export interface EntityPopupProps {
 export interface PopupContentProps {
 	entity: Cesium.Entity | undefined;
 	cesium: typeof Cesium | undefined;
+	options?: EntityPopupOptions;
 	customRenderer?: import('svelte').Snippet;
 }
