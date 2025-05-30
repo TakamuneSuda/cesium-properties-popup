@@ -1,20 +1,25 @@
 # Cesium Properties Popup
 
-Cesiumのエンティティにホバーまたはクリックでプロパティを表示するSvelteコンポーネントライブラリです。
+[![npm version](https://img.shields.io/npm/v/cesium-properties-popup.svg)](https://www.npmjs.com/package/cesium-properties-popup)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## 目次
+A Svelte component library for displaying entity properties on hover or click in CesiumJS. Supports entity types including Points, Polygons, Lines (Polylines).
 
-- [インストール](#インストール)
-- [基本的な使い方](#基本的な使い方)
-- [カスタマイズオプション](#カスタマイズオプション)
-- [スタイルのカスタマイズ](#スタイルのカスタマイズ)
-- [コンポーネント構成](#コンポーネント構成)
-- [型定義](#型定義)
-- [高度な使い方](#高度な使い方)
-- [ユーティリティ関数](#ユーティリティ関数)
-- [実装ガイドラインとベストプラクティス](#実装ガイドラインとベストプラクティス)
+## Table of Contents
 
-## インストール
+- [Installation](#installation)
+- [Basic Usage](#basic-usage)
+- [Supported Entity Types](#supported-entity-types)
+- [Customization Options](#customization-options)
+- [Styling](#styling)
+- [Component Architecture](#component-architecture)
+- [Type Definitions](#type-definitions)
+- [Advanced Usage](#advanced-usage)
+- [Utility Functions](#utility-functions)
+- [Implementation Guidelines](#implementation-guidelines)
+- [Changelog](#changelog)
+
+## Installation
 
 ```bash
 # npm
@@ -27,68 +32,107 @@ pnpm add cesium-properties-popup
 yarn add cesium-properties-popup
 ```
 
-## 基本的な使い方
+This library has peer dependencies on `cesium` and `svelte`:
+
+```bash
+# Required peer dependencies
+npm install cesium svelte
+```
+
+## Basic Usage
 
 ```svelte
 <script lang="ts">
-	import { EntityPopup, LIBRARY_VERSION } from 'cesium-properties-popup';
+	import { EntityPopup } from 'cesium-properties-popup';
 	import type * as CesiumType from 'cesium';
 
 	let viewer: CesiumType.Viewer;
 	let cesium: typeof CesiumType;
 
-	// Cesiumビューワーの初期化（省略）
+	// Cesium viewer initialization (omitted)
 </script>
 
-<!-- Cesiumのビューワーとライブラリを設定 -->
+<!-- Set up Cesium viewer -->
 <div id="cesiumContainer" />
 
-<!-- 最もシンプルな使用方法 -->
+<!-- Simplest usage -->
 <EntityPopup {viewer} {cesium} />
 ```
 
-## 開発環境のセットアップ
+The EntityPopup component automatically displays properties of Cesium entities when users hover over them or click on them in the scene.
 
-開発やデバッグ中にキャッシュによる問題が発生した場合は、以下のコマンドでキャッシュをクリアして再ビルドできます：
+## Supported Entity Types
+
+This library supports various Cesium entity types:
+
+- ✅ **Points**
+- ✅ **Polygons**
+- ✅ **Lines (Polylines)**
+- ✅ **Billboards**
+- ✅ **3D Models**
+- ✅ **Other entity types**
+
+## Development Setup
+
+If you encounter cache-related issues during development or debugging, you can clear the cache and rebuild using the following commands:
 
 ```bash
-# キャッシュクリア＆再ビルド
+# Clear cache & rebuild
 npm run rebuild
 
-# または個別に実行
-npm run clean   # .svelte-kitとnode_modules/.viteのキャッシュをクリア
-npm run build   # ライブラリを再ビルド
+# Or execute individually
+npm run clean   # Clear .svelte-kit and node_modules/.vite caches
+npm run build   # Rebuild the library
 ```
 
-## カスタマイズオプション
+## Customization Options
 
 ```svelte
 <EntityPopup
 	{viewer}
 	{cesium}
 	options={{
-		// ホバーでのポップアップ表示を有効/無効（デフォルト: true）
+		// Enable/disable hover behavior (default: true)
 		enableHover: true,
 
-		// クリック後のホバー制限時間（ミリ秒）（デフォルト: 1000）
-		clickCooldown: 1000,
-
-		// プロパティのフィルタリング
+		// Property filtering function
 		filterProperties: (name, value) => !name.startsWith('_'),
 
-		// スタイル設定
+		// Style options
 		styleOptions: {
-			maxWidth: 400,
-			maxHeight: 500,
-			popupClass: 'my-custom-popup'
+			width: 400,
+			height: 300,
+			popupClass: 'my-custom-popup',
+			backgroundColor: '#ffffff',
+			overflowY: 'auto'
 		}
 	}}
 />
 ```
 
-## スタイルのカスタマイズ
+### Options API
 
-CSSを使用してポップアップの見た目をカスタマイズできます：
+| Option             | Type     | Default     | Description                                       |
+| ------------------ | -------- | ----------- | ------------------------------------------------- |
+| `enableHover`      | boolean  | `true`      | Enable popup display on hover                     |
+| `filterProperties` | function | `undefined` | Function to filter which properties are displayed |
+| `styleOptions`     | object   | `{}`        | Style configuration for the popup                 |
+
+#### Style Options
+
+| Option            | Type   | Description                            |
+| ----------------- | ------ | -------------------------------------- |
+| `width`           | number | Popup width in pixels                  |
+| `height`          | number | Popup height in pixels                 |
+| `popupClass`      | string | CSS class to apply to popup            |
+| `backgroundColor` | string | Background color (CSS value)           |
+| `overflowY`       | string | Vertical overflow behavior (CSS value) |
+
+````
+
+## Styling
+
+You can customize the appearance of the popup using CSS:
 
 ```html
 <style>
@@ -108,41 +152,51 @@ CSSを使用してポップアップの見た目をカスタマイズできま�
 		border-spacing: 0 2px;
 	}
 </style>
-```
+````
 
-## コンポーネント構成
+## Component Architecture
 
-このライブラリは以下の主要コンポーネントで構成されています：
+This library consists of these main components:
 
-- `EntityPopup`: メインコンポーネント。Cesiumビューワー上でエンティティのポップアップを管理します。
-- `PopupPositioner`: ポップアップの位置を計算・更新するコンポーネント。カメラ移動やエンティティの位置変更に応じて自動的に位置を調整します。
-- `PopupContent`: ポップアップの内容を表示するコンポーネント。エンティティの名前、説明、プロパティを表示します。
+- `EntityPopup`: The main component that manages entity popups on a Cesium viewer.
+- `PopupPositioner`: A component that calculates and updates popup positions, automatically adjusting based on camera movements and entity position changes.
+- `PopupContent`: A component that displays the popup content, showing entity names, descriptions, and properties.
 
-## 型定義
+### Entity Position Strategy System
+
+The library uses a **Strategy Pattern** to handle different entity types:
+
+- `PointStrategy`: Uses direct position for point entities
+- `PolylineStrategy`: **[NEW]** Calculates midpoint for line entities
+- `PolygonStrategy`: Calculates center point using bounding sphere for polygon entities
+
+## Type Definitions
 
 ```typescript
 interface EntityPopupOptions {
-	/** ホバーでポップアップを表示するかどうか */
+	/** Whether to show popup on hover */
 	enableHover?: boolean;
-	/** クリック後のホバー制限時間（ミリ秒） */
-	clickCooldown?: number;
-	/** プロパティをフィルタリングする関数 */
+	/** Function to filter properties */
 	filterProperties?: (name: string, value: unknown) => boolean;
-	/** ポップアップのCSS設定 */
+	/** Popup CSS settings */
 	styleOptions?: {
-		/** ポップアップの最大幅（px） */
-		maxWidth?: number;
-		/** ポップアップの最大高さ（px） */
-		maxHeight?: number;
-		/** ポップアップのCSSクラス */
+		/** Popup width in pixels */
+		width?: number;
+		/** Popup height in pixels */
+		height?: number;
+		/** CSS class for the popup */
 		popupClass?: string;
+		/** Background color (CSS value) */
+		backgroundColor?: string;
+		/** Vertical overflow behavior (CSS value) */
+		overflowY?: string;
 	};
 }
 ```
 
-## 高度な使い方
+## Advanced Usage
 
-必要に応じて、各コンポーネントを個別に使用することも可能です：
+You can use individual components as needed for more custom implementations:
 
 ```svelte
 <script lang="ts">
@@ -154,13 +208,13 @@ interface EntityPopupOptions {
 	let selectedEntity: CesiumType.Entity | undefined;
 	let isPopupOpen = false;
 
-	// エンティティ選択のカスタムロジック
+	// Custom entity selection logic
 	function handleEntitySelect(entity) {
 		selectedEntity = entity;
 		isPopupOpen = true;
 	}
 
-	// カスタムイベントハンドラの設定
+	// Custom event handler setup
 	const handler = new cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
 	handler.setInputAction((click) => {
 		const pickedObject = viewer.scene.pick(click.position);
@@ -175,16 +229,16 @@ interface EntityPopupOptions {
 		<div class="custom-popup">
 			<PopupContent entity={selectedEntity} {cesium} />
 			<div class="actions">
-				<button on:click={() => (isPopupOpen = false)}>閉じる</button>
+				<button on:click={() => (isPopupOpen = false)}>Close</button>
 			</div>
 		</div>
 	</PopupPositioner>
 {/if}
 ```
 
-## ユーティリティ関数
+## Utility Functions
 
-ライブラリが提供するユーティリティ関数を直接使用することも可能です：
+You can directly use the utility functions provided by the library:
 
 ```typescript
 import {
@@ -196,52 +250,52 @@ import {
 	defaultSettings
 } from 'cesium-properties-popup';
 
-// エンティティのプロパティ値をフォーマットする
+// Format entity property value
 const formattedValue = formatPropertyValue(entity.properties.myProperty, cesium);
 
-// エンティティから表示用のプロパティエントリを取得
+// Get property entries from an entity for display
 const propertyEntries = getPropertyEntries(entity);
 
-// エンティティの3D位置を取得する
+// Get entity's 3D position
 const position = getEntityPosition(entity, cesium);
 
-// 3D座標を画面座標に変換する
+// Convert 3D coordinates to screen coordinates
 const screenPosition = worldPositionToScreenPosition(position, viewer, cesium);
 
-// ポップアップの位置を計算する包括関数
+// Comprehensive function to calculate popup position
 const popupPosition = await calculatePopupPosition(entity, viewer, cesium, currentPosition);
 
-// デフォルト設定の変更（パフォーマンスチューニングなど）
-defaultSettings.updateFrequency.cameraChangeThrottle = 150; // カメラ変更のスロットリング間隔を150msに変更
+// Change default settings (for performance tuning, etc.)
+defaultSettings.updateFrequency.cameraChangeThrottle = 150; // Change camera change throttling interval to 150ms
 ```
 
-## 実装ガイドラインとベストプラクティス
+## Implementation Guidelines and Best Practices
 
-### パフォーマンス最適化
+### Performance Optimization
 
-1. **大量のエンティティを扱う場合**
+1. **When dealing with many entities**
 
    ```typescript
-   // フィルタリングで表示プロパティを限定
+   // Limit displayed properties using filtering
    const popupOptions = {
    	filterProperties: (name, value) => {
-   		// 重要なプロパティのみを表示
+   		// Show only important properties
    		const importantProps = ['name', 'type', 'value', 'category'];
    		return importantProps.includes(name);
    	}
    };
    ```
 
-2. **複雑なプロパティを持つエンティティの場合**
+2. **For entities with complex properties**
 
    ```typescript
-   // 巨大なJSONプロパティを持つエンティティの表示を最適化
+   // Optimize display for entities with large JSON properties
    const popupOptions = {
    	filterProperties: (name, value) => {
-   		// 巨大なオブジェクトや複雑なデータ構造は除外
+   		// Exclude large objects or complex data structures
    		if (typeof value === 'object' && value !== null) {
    			if (name === 'attributes' || name === 'metadata') {
-   				return false; // 複雑なデータは除外
+   				return false; // Exclude complex data
    			}
    		}
    		return true;
@@ -249,9 +303,9 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // カメラ変更�
    };
    ```
 
-### 視覚的カスタマイズ
+### Visual Customization
 
-1. **テーマに合わせたスタイル**
+1. **Theme-specific styling**
 
    ```svelte
    <EntityPopup
@@ -279,7 +333,7 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // カメラ変更�
    </style>
    ```
 
-2. **状況に応じたスタイル変更**
+2. **Situational style changes**
 
    ```svelte
    <script lang="ts">
@@ -298,7 +352,7 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // カメラ変更�
    	};
    </script>
 
-   <button on:click={toggleTheme}>テーマ切替</button>
+   <button on:click={toggleTheme}>Toggle Theme</button>
    <EntityPopup {viewer} {cesium} options={popupOptions} />
 
    <style>
@@ -314,9 +368,9 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // カメラ変更�
    </style>
    ```
 
-### ユースケース別のヒント
+### Use-case Specific Tips
 
-1. **不動産データの表示**
+1. **Real estate data display**
 
    ```svelte
    <script>
@@ -326,11 +380,11 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // カメラ変更�
    </script>
    ```
 
-2. **時系列データの表示**
+2. **Time-series data display**
 
    ```svelte
    <script>
-   	// 時系列データではフィルタリングでより必要な情報に焦点を当てます
+   	// For time-series data, focus on more relevant information with filtering
    	const popupOptions = {
    		filterProperties: (name) =>
    			['timestamp', 'observed_at', 'temperature', 'value'].includes(name)
@@ -338,10 +392,6 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // カメラ変更�
    </script>
    ```
 
-## ライセンス
+## License
 
 MIT
-
-## 開発者向け情報
-
-詳しい実装の詳細やポップアップの位置計算ロジックについては、ソースコードのコメントを参照してください。

@@ -1,7 +1,7 @@
 /**
- * Cesium Properties Popup ライブラリ
- * Cesiumのエンティティにホバーまたはクリックでプロパティを表示するコンポーネント
- * 2025-05-29: 統合作業後に再定義
+ * Cesium Properties Popup Library
+ * A component to display properties of Cesium entities on hover or click
+ * 2025-05-29: Redefined after integration work
  */
 
 // コアコンポーネントのエクスポート

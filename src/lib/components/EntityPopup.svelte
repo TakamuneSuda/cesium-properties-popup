@@ -14,18 +14,17 @@
 
 	let selectedEntity: CesiumType.Entity | undefined = $state(undefined);
 	let isPopupOpen = $state(false);
-	// eventHandler を $state から通常の let 変数に変更
+	// Changed eventHandler from $state to a regular let variable
 	let currentEventHandler: CesiumType.ScreenSpaceEventHandler | undefined = undefined;
 
 	let displayMode: 'hover' | 'click' = 'hover';
 	let isProcessingClick = false;
 
 	$effect(() => {
-		// options から設定値を取得し、デフォルト値を設定
+		// Get configuration values from options and set defaults
 		const enableHoverEffect = options.enableHover ?? true;
-		const clickCooldownEffect = options.clickCooldown ?? 1000;
 
-		// 既存のイベントハンドラをクリーンアップする内部関数
+		// Internal function to clean up existing event handlers
 		const cleanupEventHandler = () => {
 			if (currentEventHandler) {
 				currentEventHandler.destroy();
@@ -33,26 +32,21 @@
 			}
 		};
 
-		// effect が再実行される前に、まず既存のハンドラをクリーンアップ
+		// Clean up existing handlers before the effect is re-executed
 		cleanupEventHandler();
 
 		if (viewer && cesium) {
 			currentEventHandler = new cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
 
-			// 左クリックイベントを監視
+			// Monitor left click events
 			currentEventHandler.setInputAction(
 				(click: CesiumType.ScreenSpaceEventHandler.PositionedEvent) => {
 					const pickedObject = viewer.scene.pick(click.position);
 
 					if (cesium.defined(pickedObject) && pickedObject.id instanceof cesium.Entity) {
-						isProcessingClick = true;
 						selectedEntity = pickedObject.id;
 						displayMode = 'click';
 						isPopupOpen = true;
-
-						setTimeout(() => {
-							isProcessingClick = false;
-						}, clickCooldownEffect); // options から取得したクールダウン時間を使用
 					} else {
 						displayMode = 'hover';
 						closePopup();
@@ -61,7 +55,7 @@
 				cesium.ScreenSpaceEventType.LEFT_CLICK
 			);
 
-			// ホバーイベントを追加（enableHover が true の場合のみ）
+			// Add hover events (only if enableHover is true)
 			if (enableHoverEffect) {
 				currentEventHandler.setInputAction(
 					(movement: CesiumType.ScreenSpaceEventHandler.MotionEvent) => {
@@ -82,11 +76,11 @@
 				);
 			}
 
-			// この effect インスタンスのクリーンアップ関数
+			// Cleanup function for this effect instance
 			return cleanupEventHandler;
 		} else {
-			// viewer または cesium が利用できない場合、既存のハンドラは既にクリーンアップされているはず。
-			// 何も設定されなかったので、空のクリーンアップ関数を返す。
+			// If viewer or cesium is not available, existing handlers should already be cleaned up.
+			// Nothing was set up, so return an empty cleanup function.
 			return () => {};
 		}
 	});
@@ -94,8 +88,8 @@
 	function closePopup() {
 		isPopupOpen = false;
 		selectedEntity = undefined;
-		// displayMode は LEFT_CLICK のelse節で 'hover' に戻されるため、
-		// ここで明示的に displayMode を変更する必要は、現在のロジックではなさそう。
+		// displayMode is reset to 'hover' in the LEFT_CLICK else clause,
+		// so there's no need to explicitly change displayMode in the current logic.
 	}
 </script>
 

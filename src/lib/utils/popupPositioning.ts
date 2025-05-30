@@ -3,20 +3,20 @@ import { getEntityPosition, worldPositionToScreenPosition } from './entityHelper
 import { LRUCache } from './terrainHeightCache';
 import { POPUP_SETTINGS } from './popupSettings';
 
-// 地形高さのキャッシュをLRUキャッシュで保持（最大20エントリ）
+// Maintain terrain height in LRU cache (max 20 entries)
 const terrainHeightCache = new LRUCache<string, number>(20);
 
-// 2次フィルター用の閾値（UIの微小更新を防止）
+// Threshold for secondary filter (prevent minor UI updates)
 const UI_UPDATE_THRESHOLD = POPUP_SETTINGS.positioning.thresholds.secondStage;
 
 /**
- * 地物の位置に基づいてポップアップ位置を更新する関数
+ * Function to update popup position based on feature location
  *
- * @param selectedEntity 選択されたエンティティ
- * @param viewer Cesiumビューア
- * @param cesium Cesiumライブラリの参照
- * @param currentPosition 現在のポップアップ位置
- * @returns 更新されたポップアップ位置、または計算できない場合はundefined
+ * @param selectedEntity Selected entity
+ * @param viewer Cesium viewer
+ * @param cesium Reference to the Cesium library
+ * @param currentPosition Current popup position
+ * @returns Updated popup position, or undefined if calculation is not possible
  */
 export async function calculatePopupPosition(
 	selectedEntity: CesiumType.Entity,
@@ -27,30 +27,30 @@ export async function calculatePopupPosition(
 	if (!selectedEntity || !viewer || !cesium) return undefined;
 
 	try {
-		// 地物の3D座標を取得
+		// Get 3D coordinates of the feature
 		const entityPosition = getEntityPosition(selectedEntity, cesium);
 		if (!entityPosition) return undefined;
 
-		// Cartographic座標に変換（地形サンプリングのために必要）
+		// Convert to Cartographic coordinates (needed for terrain sampling)
 		const cartographic = cesium.Cartographic.fromCartesian(entityPosition);
 		if (!cartographic) return undefined;
 
-		// 地形の高さを考慮した位置計算
+		// Position calculation considering terrain height
 		let terrainHeight = 0;
 
-		// キャッシュキーを作成 (エンティティID)
+		// Create cache key (entity ID)
 		const entityId = String(selectedEntity.id);
 
 		if (viewer.terrainProvider) {
-			// キャッシュにあるか確認
+			// Check if height is in cache
 			if (terrainHeightCache.has(entityId)) {
-				// キャッシュから取得
+				// Get from cache
 				terrainHeight = terrainHeightCache.get(entityId)!;
 			} else {
 				try {
-					// 地形の高さを取得するためのサンプリング
+					// Sample terrain to get height
 					const terrainSamplePositions = [cartographic];
-					// まずは詳細な地形情報を試す
+					// First try detailed terrain information
 					try {
 						const updatedPositions = await cesium.sampleTerrainMostDetailed(
 							viewer.terrainProvider,
@@ -59,29 +59,32 @@ export async function calculatePopupPosition(
 						// 地形高さを取得
 						terrainHeight = updatedPositions[0].height || 0;
 					} catch (detailedError) {
-						// 詳細な方法が失敗したら、より単純な方法を試す
-						console.warn('詳細な地形取得に失敗、標準方法で再試行します:', detailedError);
+						// If detailed method fails, try a simpler approach
+						console.warn(
+							'Detailed terrain sampling failed, trying standard method:',
+							detailedError
+						);
 						try {
-							// 地形の標高を取得（レベル9 - より安定した計算）
+							// Get terrain elevation (level 9 - more stable calculation)
 							const level9Positions = await cesium.sampleTerrain(
 								viewer.terrainProvider,
-								9, // より安定したレベル
+								9, // More stable level
 								terrainSamplePositions
 							);
 							terrainHeight = level9Positions[0].height || 0;
 						} catch (simpleError) {
-							console.warn('地形取得に失敗:', simpleError);
+							console.warn('Terrain sampling failed:', simpleError);
 						}
 					}
 
-					// キャッシュに保存
+					// Save to cache
 					terrainHeightCache.set(entityId, terrainHeight);
 				} catch (error) {
-					console.warn('地形サンプリング中にエラーが発生:', error);
+					console.warn('Error during terrain sampling:', error);
 				}
 			}
 
-			// エンティティが地表より下にある場合は地表の高さを使用
+			// If entity is below ground, use ground height
 			if (cartographic.height < terrainHeight) {
 				cartographic.height = terrainHeight;
 			}
@@ -98,8 +101,8 @@ export async function calculatePopupPosition(
 		// 2. 中・遠距離では距離に比例したオフセット
 		// 3. オフセットに上限を設ける（遠すぎる場合に巨大なオフセットを防止）
 		const minOffset = 15; // 最小オフセット（メートル）
-		const maxOffset = 500; // 最大オフセット（メートル）
-		const distanceFactor = 0.05; // 距離の5%（より大きめのオフセット）
+		const maxOffset = 500; // Maximum offset (meters)
+		const distanceFactor = 0.05; // 5% of distance (larger offset)
 
 		// オフセット計算: 最小値と最大値の間に収まるよう制限
 		const offsetScale = Math.min(Math.max(cameraDistance * distanceFactor, minOffset), maxOffset);
@@ -138,7 +141,7 @@ export async function calculatePopupPosition(
 
 		return currentPosition;
 	} catch (error) {
-		console.error('ポップアップ位置更新中にエラーが発生しました:', error);
+		console.error('Error during popup position update:', error);
 		return undefined;
 	}
 }

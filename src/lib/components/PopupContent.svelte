@@ -1,24 +1,23 @@
 <script lang="ts">
-	import type * as CesiumType from 'cesium';
 	import { formatPropertyValue, getPropertyEntries } from '../utils/entityHelpers';
 	import type { EntityPopupOptions, PopupContentProps } from '../types';
 
-	// PopupContentProps からオプションパラメータを追加
+	// Add optional parameters from PopupContentProps
 	let {
 		entity,
 		cesium,
 		options = {}
 	}: PopupContentProps & { options?: EntityPopupOptions } = $props();
 
-	// プロパティをフィルタリングするための関数
+	// Function to filter properties
 	function filterProperty(name: string, value: unknown): boolean {
 		if (options.filterProperties) {
 			return options.filterProperties(name, value);
 		}
-		return true; // デフォルトではすべてのプロパティを表示
+		return true; // By default, show all properties
 	}
 
-	// エンティティから表示対象のプロパティを取得して必要に応じてフィルタリング
+	// Get properties to display from the entity and filter as needed
 	let filteredProperties = $derived(
 		entity ? getPropertyEntries(entity).filter(([key, value]) => filterProperty(key, value)) : []
 	);
@@ -38,12 +37,10 @@
 				</tbody>
 			</table>
 		{:else}
-			<p>プロパティがありません</p>
+			<p>No properties available</p>
 		{/if}
 	</div>
 </div>
-<!-- ポップアップの視認性を高めるための接続線 -->
-<div class="popup-pointer"></div>
 
 <style>
 	.popup-content {

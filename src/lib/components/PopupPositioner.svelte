@@ -1,37 +1,80 @@
 <script lang="ts">
-	import type * as CesiumType from 'cesium';
 	import { throttle } from '../utils/throttle';
 	import { calculatePopupPosition } from '../utils/popupPositioning';
 	import { POPUP_SETTINGS } from '../utils/popupSettings';
-	import type { EntityPopupOptions, PopupPositionerProps } from '../types';
 
-	// Props と デフォルト設定のマージ
-	let props = $props<PopupPositionerProps>();
-	let { viewer, cesium, entity, isPopupOpen, children } = props;
-	let options = {
+	import type { PopupPositionerProps } from '../types';
+
+	const props = $props<PopupPositionerProps>();
+
+	let viewer = $state(props.viewer);
+	let cesium = $state(props.cesium);
+	let entity = $state(props.entity);
+	let isPopupOpen = $state(props.isPopupOpen);
+	let children = $state(props.children);
+	let options = $state({
 		...props.options,
 		styleOptions: {
-			...POPUP_SETTINGS.defaultStyles, // デフォルトスタイル
-			...(props.options?.styleOptions || {}) // ユーザー設定で上書き
+			...POPUP_SETTINGS.defaultStyles,
+			...(props.options?.styleOptions || {})
 		}
-	};
+	});
+
+	// プロパティの変更を監視して状態を更新
+	$effect(() => {
+		viewer = props.viewer;
+		cesium = props.cesium;
+		entity = props.entity;
+		isPopupOpen = props.isPopupOpen;
+		children = props.children;
+		options = {
+			...props.options,
+			styleOptions: {
+				...POPUP_SETTINGS.defaultStyles,
+				...(props.options?.styleOptions || {})
+			}
+		};
+	});
 
 	let popupPosition = $state({ x: 0, y: 0 });
 	let isPositionCalculated = $state(false);
-
-	// Effect 1 で管理するリスナーのクリーンアップ関数を保持
-	let cleanupCameraChangeListener: (() => void) | undefined = undefined;
-	let cleanupPreRenderListener: (() => void) | undefined = undefined;
-
-	// イベント処理の最適化のための内部状態 (通常の let 変数)
 	let lastUpdateSource = '';
 	let lastUpdateTime = 0;
+	let previousEntityId = $state<string | null>(null);
 
-	// Effect 1: Cesium のイベントリスナー (camera.changed, scene.preRender) を管理
-	// `viewer` または `cesium` プロパティの変更に反応してリスナーを設定・解除
+	// クリーンアップ関数の変数を定義
+	let cleanupCameraChangeListener: (() => void) | undefined;
+	let cleanupPreRenderListener: (() => void) | undefined;
+
+	// エンティティとポップアップの状態変更を監視
 	$effect(() => {
-		// この effect が再実行される際 (例: viewer インスタンスの変更) に、
-		// 前回の effect 実行時に設定されたリスナーが残っていればクリーンアップする
+		// isPopupOpenが変更された時の処理
+		if (!isPopupOpen) {
+			isPositionCalculated = false;
+			return;
+		}
+
+		// エンティティが変更された時の処理
+		if (entity?.id !== previousEntityId) {
+			isPositionCalculated = false;
+			popupPosition = { x: 0, y: 0 };
+			lastUpdateTime = 0;
+			lastUpdateSource = '';
+			previousEntityId = entity?.id ?? null;
+		}
+
+		// 必要な条件が揃っている場合のみ位置を更新
+		if (isPopupOpen && entity && viewer && cesium) {
+			updatePopupPosition('reactive').catch((error) =>
+				console.warn('PopupPositioner: Position update error:', error)
+			);
+		}
+	});
+
+	// Effect 1: Manages Cesium event listeners
+	$effect(() => {
+		// When this effect re-executes (e.g., when viewer instance changes),
+		// clean up any listeners that were set during the previous effect execution
 		cleanupCameraChangeListener?.();
 		cleanupCameraChangeListener = undefined;
 		cleanupPreRenderListener?.();
@@ -40,7 +83,7 @@
 		if (viewer && cesium) {
 			// --- Camera Change Listener ---
 			const throttledCameraUpdate = throttle(() => {
-				// スロットルされた関数が実行される時点で最新の props を確認
+				// Check latest props at the time the throttled function executes
 				if (isPopupOpen && entity && viewer && cesium) {
 					updatePopupPosition('camera').catch((error) =>
 						console.warn('PopupPositioner: Camera change update error:', error)
@@ -53,17 +96,17 @@
 
 			// --- PreRender Listener ---
 			const throttledRenderUpdate = throttle(() => {
-				// スロットルされた関数が実行される時点で最新の props を確認
+				// Check latest props at the time the throttled function executes
 				if (isPopupOpen && entity && viewer && cesium) {
 					updatePopupPosition('renderLoop').catch((error) =>
 						console.warn('PopupPositioner: Render loop update error:', error)
 					);
 				}
 			}, POPUP_SETTINGS.updateFrequency.renderLoopThrottle);
-			// viewer.scene.preRender.addEventListener は解除用の関数を返す
+			// viewer.scene.preRender.addEventListener returns a function for removal
 			cleanupPreRenderListener = viewer.scene.preRender.addEventListener(throttledRenderUpdate);
 
-			// この effect インスタンスのクリーンアップ関数
+			// Cleanup function for this effect instance
 			return () => {
 				cleanupCameraChangeListener?.();
 				cleanupCameraChangeListener = undefined;
@@ -71,39 +114,21 @@
 				cleanupPreRenderListener = undefined;
 			};
 		}
-		// viewer や cesium が未定義の場合、リスナーは設定されず、
-		// 以前の有効な状態からの既存のリスナーは、上記の return 関数または
-		// effect ブロックの開始時の明示的なクリーンアップによって処理される。
-	});
-
-	// Effect 2: `isPopupOpen`、`entity` の変更に反応し、ポップアップの表示/非表示と位置を更新
-	// マウント時やプロパティ更新時に条件が満たされれば、初期の位置計算も処理
-	$effect(() => {
-		if (isPopupOpen && entity && viewer && cesium) {
-			// ポップアップを表示し、位置を計算する条件が満たされている
-			updatePopupPosition('reactive').catch((error) =>
-				console.warn('PopupPositioner: Reactive update error:', error)
-			);
-		} else {
-			// ポップアップが非表示、または entity/viewer/cesium が利用不可
-			// `isPositionCalculated` をリセットしてポップアップ div を非表示にする
-			if (isPositionCalculated) {
-				// 実際に変更がある場合のみ state を更新
-				isPositionCalculated = false;
-			}
-		}
+		// If viewer or cesium is undefined, listeners are not set up,
+		// and any existing listeners from a previously valid state are handled
+		// by the return function above or the explicit cleanup at the start of the effect block.
 	});
 
 	async function updatePopupPosition(source: 'camera' | 'renderLoop' | 'reactive' = 'reactive') {
-		// 必須の props が欠けている場合は処理を中断 (effect でもチェックしているが念のため)
+		// Abort if required props are missing (double-checking even though effects also check)
 		if (!entity || !viewer || !cesium) {
 			if (isPositionCalculated) {
-				isPositionCalculated = false; // コンテキストが失われたらポップアップを非表示
+				isPositionCalculated = false; // Hide popup if context is lost
 			}
 			return;
 		}
 
-		// 最適化: 短時間での異なるソースからの重複更新を防止
+		// Optimization: Prevent duplicate updates from different sources in a short time
 		const now = Date.now();
 		if (
 			source === 'renderLoop' &&
@@ -113,26 +138,24 @@
 			return;
 		}
 
-		const newPosition = await calculatePopupPosition(entity, viewer, cesium, popupPosition);
+		// 現在位置を渡さずに新しい位置を計算
+		const newPosition = await calculatePopupPosition(entity, viewer, cesium, { x: 0, y: 0 });
 
 		if (newPosition) {
 			lastUpdateTime = now;
 			lastUpdateSource = source;
-			popupPosition = newPosition; // $state を更新: ポップアップのスクリーン座標
+			popupPosition = newPosition;
 
+			// 位置計算が完了したらポップアップを表示
 			if (!isPositionCalculated) {
-				// 位置が正常に計算されたので、レンダリングのためにフラグを立てる
-				// Svelte 5 の effect 内では直接代入で問題ないことが多い
-				// タイミングの問題 (ちらつきなど) が発生した場合は、
-				// `setTimeout(() => isPositionCalculated = true, 0)` に戻すことを検討
 				isPositionCalculated = true;
 			}
 		} else {
-			// 新しい位置の計算に失敗 (例: エンティティが画面外)
-			// ポップアップが表示されていた場合、非表示にする必要があるかもしれない
-			// 現在のロジックでは、calculatePopupPosition が null を返しても isPositionCalculated は false に設定されない
-			// Effect 2 が isPopupOpen/entity の変更で非表示にするが、計算失敗自体では処理しない
-			// if (isPositionCalculated) isPositionCalculated = false; // 必要であればこの行を追加検討
+			// Failed to calculate new position (e.g., entity is off-screen)
+			// Hide the popup when entity goes off-screen
+			if (isPositionCalculated) {
+				isPositionCalculated = false; // Hide popup when entity is off-screen
+			}
 		}
 	}
 </script>
@@ -158,42 +181,35 @@
 {/if}
 
 <style>
-	/* ポップアップの基本スタイル */
+	/* Basic popup styles */
 	.cesium-entity-popup {
-		/* 表示レイヤー制御 */
+		/* Display layer control */
 		z-index: 1000;
 		position: relative;
 
-		/* 位置調整 - エンティティの位置から上にシフトした基準点 */
+		/* Position adjustment - reference point shifted up from entity position */
 		margin-top: -0.625rem;
 		transform: translateX(-50%) translateY(-100%);
 
-		/* サイズ制限 */
+		/* Size limits */
 		max-height: 400px;
 		max-width: 400px;
-		min-width: 250px;
+		min-width: 200px;
 
-		/* スクロール設定 - コンテンツがあふれた場合の対応 */
+		/* Scroll settings - handling overflow content */
 		overflow: auto;
 
-		/* 視覚的スタイル */
-		border-radius: 0.375rem; /* より丸みのある角 */
-		border-left: 3px solid #3b82f6; /* アクセントの青いボーダー */
+		/* Visual styles */
+		border-radius: 0.375rem; /* More rounded corners */
 		background-color: rgba(255, 255, 255, 0.95);
 		font-family:
 			system-ui,
 			-apple-system,
 			sans-serif;
 		font-smooth: antialiased;
-		opacity: 0.95; /* より高い不透明度で読みやすく */
+		opacity: 0.95; /* Higher opacity for better readability */
 
-		/* シャドウ効果 - よりシャープで現代的 */
-		box-shadow:
-			0 10px 20px -5px rgba(0, 0, 0, 0.15),
-			0 4px 8px -2px rgba(0, 0, 0, 0.1),
-			0 0 0 1px rgba(0, 0, 0, 0.05);
-
-		/* アニメーションとパフォーマンス最適化 */
+		/* Animation and performance optimization */
 		will-change: transform;
 	}
 </style>

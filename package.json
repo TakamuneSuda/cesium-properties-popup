@@ -1,7 +1,7 @@
 {
 	"name": "cesium-properties-popup",
 	"version": "0.1.0",
-	"description": "Cesiumのエンティティにホバーまたはクリックでプロパティを表示するSvelteコンポーネント",
+	"description": "A Svelte component for displaying entity properties on hover or click in Cesium",
 	"type": "module",
 	"license": "MIT",
 	"keywords": [
@@ -13,9 +13,9 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/yourusername/cesium-properties-popup"
+		"url": "https://github.com/takamunesuda/cesium-properties-popup"
 	},
-	"author": "Your Name",
+	"author": "takamunesuda (https://x.com/STakamu2532)",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "svelte-package",

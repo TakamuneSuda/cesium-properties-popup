@@ -97,6 +97,52 @@ export class PolygonStrategy implements EntityPositionStrategy {
 }
 
 /**
+ * ポリラインエンティティ用戦略
+ */
+export class PolylineStrategy implements EntityPositionStrategy {
+	getPosition(
+		entity: CesiumType.Entity,
+		cesium: typeof CesiumType
+	): CesiumType.Cartesian3 | undefined {
+		if (!entity.polyline?.positions) return undefined;
+
+		try {
+			const julianDate = cesium.JulianDate.now();
+			const property = entity.polyline.positions;
+
+			let positions: CesiumType.Cartesian3[] | undefined;
+
+			// プロパティがCesiumのPropertyオブジェクトかどうかチェック
+			if (isCesiumProperty(property)) {
+				positions = property.getValue(julianDate);
+			} else if (Array.isArray(property)) {
+				positions = property;
+			}
+
+			if (!positions || positions.length === 0) {
+				return undefined;
+			}
+
+			// 単一点の場合はその点を返す
+			if (positions.length === 1) {
+				return positions[0];
+			}
+
+			// 複数点の場合は中点を計算
+			const midIndex = Math.floor(positions.length / 2);
+			return positions[midIndex];
+		} catch (e: unknown) {
+			console.error('ポリライン位置取得エラー:', e instanceof Error ? e.message : String(e));
+		}
+		return undefined;
+	}
+
+	isApplicable(entity: CesiumType.Entity): boolean {
+		return !!entity.polyline && !!entity.polyline.positions;
+	}
+}
+
+/**
  * ビルボードエンティティ用戦略
  */
 export class BillboardStrategy implements EntityPositionStrategy {
@@ -182,6 +228,7 @@ export class ModelStrategy implements EntityPositionStrategy {
  */
 export const entityPositionStrategies: EntityPositionStrategy[] = [
 	new PolygonStrategy(),
+	new PolylineStrategy(),
 	new BillboardStrategy(),
 	new PointStrategy(),
 	new ModelStrategy(),

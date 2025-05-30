@@ -1,7 +1,7 @@
 /**
- * LRUキャッシュの実装
- * Least Recently Used（最近最も使われていない）アルゴリズムを使用して、
- * キャッシュサイズが上限に達した時に最も古く使用されたエントリを削除します
+ * LRU Cache Implementation
+ * Uses the Least Recently Used algorithm to delete the oldest used entry
+ * when the cache size reaches the maximum limit
  */
 export class LRUCache<K, V> {
 	private cache = new Map<K, V>();
@@ -10,26 +10,26 @@ export class LRUCache<K, V> {
 	private misses = 0;
 
 	/**
-	 * LRUキャッシュを初期化
+	 * Initialize LRU cache
 	 *
-	 * @param maxSize キャッシュの最大サイズ
+	 * @param maxSize Maximum cache size
 	 */
 	constructor(maxSize: number) {
 		this.maxSize = maxSize;
 	}
 
 	/**
-	 * キャッシュからデータを取得し、最近使用したものとして更新
+	 * Get data from cache and update as recently used
 	 *
-	 * @param key キャッシュのキー
-	 * @returns キャッシュに存在する場合はその値、存在しない場合はundefined
+	 * @param key Cache key
+	 * @returns Value if exists in cache, undefined otherwise
 	 */
 	get(key: K): V | undefined {
-		// キャッシュにあれば取り出して最新に更新
+		// If in cache, retrieve and update as most recent
 		if (this.cache.has(key)) {
 			this.hits++;
 			const value = this.cache.get(key)!;
-			// 最近使用したエントリを最新として扱うために一旦削除して再設定
+			// Delete and re-add to mark as most recently used
 			this.cache.delete(key);
 			this.cache.set(key, value);
 			return value;
@@ -40,27 +40,29 @@ export class LRUCache<K, V> {
 	}
 
 	/**
-	 * キャッシュにデータを設定
+	 * Set data in cache
 	 *
-	 * @param key キャッシュのキー
-	 * @param value 保存する値
+	 * @param key Cache key
+	 * @param value Value to store
 	 */
 	set(key: K, value: V): void {
-		// すでにキーがある場合は削除
+		// Delete if key already exists
 		if (this.cache.has(key)) {
 			this.cache.delete(key);
 		}
-		// キャッシュサイズが上限に達していれば最も古いエントリを削除
+		// If cache size has reached maximum, remove oldest entry
 		if (this.cache.size >= this.maxSize) {
 			const oldestKey = this.cache.keys().next().value;
-			this.cache.delete(oldestKey);
+			if (oldestKey !== undefined) {
+				this.cache.delete(oldestKey);
+			}
 		}
-		// 新しいエントリを追加
+		// Add new entry
 		this.cache.set(key, value);
 	}
 
 	/**
-	 * キャッシュをクリア
+	 * Clear cache
 	 */
 	clear(): void {
 		this.cache.clear();
@@ -69,26 +71,26 @@ export class LRUCache<K, V> {
 	}
 
 	/**
-	 * 現在のキャッシュサイズを取得
+	 * Get current cache size
 	 */
 	get size(): number {
 		return this.cache.size;
 	}
 
 	/**
-	 * キーがキャッシュに存在するか確認
+	 * Check if key exists in cache
 	 *
-	 * @param key 確認するキー
-	 * @returns キャッシュに存在する場合はtrue、存在しない場合はfalse
+	 * @param key Key to check
+	 * @returns true if exists in cache, false otherwise
 	 */
 	has(key: K): boolean {
 		return this.cache.has(key);
 	}
 
 	/**
-	 * キャッシュの統計情報を取得
+	 * Get cache statistics
 	 *
-	 * @returns キャッシュのヒット数、ミス数、ヒット率等の統計情報
+	 * @returns Statistics including hits, misses, hit ratio, etc.
 	 */
 	getStats() {
 		const totalAccess = this.hits + this.misses;

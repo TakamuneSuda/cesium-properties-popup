@@ -5,18 +5,41 @@
 	import type * as CesiumType from 'cesium';
 	import Entities from './Entities.svelte';
 	// ライブラリからEntityPopupとバージョン情報をインポート
-	import { EntityPopup, type EntityPopupOptions } from '$lib';
+	import { EntityPopup as LibraryEntityPopup } from '$lib';
+
+	let { popupOptions } = $props();
+
+	// デバッグログを追加
+	$effect(() => {
+		console.log('PopupOptions詳細:', {
+			...popupOptions,
+			entityTypes: popupOptions?.entityTypes,
+			propertyNames: popupOptions?.propertyNames
+		});
+	});
+
+	// クリックイベントのハンドラー
+	function handleClick(e: MouseEvent) {
+		if (viewer && cesium) {
+			const pick = viewer.scene.pick(new cesium.Cartesian2(e.clientX, e.clientY));
+			console.log('Picked object:', pick);
+			if (pick?.id) {
+				console.log('Entity details:', {
+					id: pick.id.id,
+					name: pick.id.name,
+					properties: pick.id.properties,
+					type: pick.id.constructor.name,
+					hasPolyline: !!pick.id.polyline,
+					primitive: pick.primitive?.constructor.name
+				});
+			}
+		}
+	}
 
 	// Cesium モジュールは動的インポートするので、型は import 型を利用
-	let cesium: typeof CesiumType = $state();
-	let viewer: CesiumType.Viewer = $state();
+	let cesium: typeof CesiumType | undefined = $state();
+	let viewer: CesiumType.Viewer | undefined = $state();
 	let viewerReady = $state(false); // viewer の準備状態を追跡するフラグ
-
-	// ポップアップの設定オプション - デフォルトスタイルを使用
-	const popupOptions: EntityPopupOptions = {
-		enableHover: true
-		// styleOptionsは指定せず、ライブラリのデフォルト設定を使用
-	};
 
 	onMount(async (): Promise<void> => {
 		if (!browser) return;
@@ -78,7 +101,7 @@
 			});
 
 			// 透過させないようにする
-			viewer.scene.globe.depthTestAgainstTerrain = true;
+			viewer.scene.globe.depthTestAgainstTerrain = false;
 
 			// viewerの準備ができたことを示す
 			viewerReady = true;
@@ -88,12 +111,14 @@
 	});
 </script>
 
+<!-- デバッグ用のクリックイベントリスナー -->
+<svelte:window on:click={handleClick} />
+
 <!-- Cesium を描画するコンテナ -->
 <div id="cesiumContainer" class="h-full w-full"></div>
-
 <!-- viewerが準備できたらEntitiesコンポーネントとEntityPopupを表示 -->
 {#if viewerReady && viewer && cesium}
 	<Entities {viewer} {cesium} />
 	<!-- ライブラリのEntityPopupコンポーネントを使用 -->
-	<EntityPopup {viewer} {cesium} options={popupOptions} />
+	<LibraryEntityPopup {viewer} {cesium} options={popupOptions} />
 {/if}

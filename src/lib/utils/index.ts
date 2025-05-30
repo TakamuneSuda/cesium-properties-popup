@@ -6,8 +6,6 @@ import type * as CesiumType from 'cesium';
 export interface EntityPopupOptions {
 	/** ホバーでポップアップを表示するかどうか */
 	enableHover?: boolean;
-	/** クリック後のホバー制限時間（ミリ秒） */
-	clickCooldown?: number;
 	/** プロパティをフィルタリングする関数 */
 	filterProperties?: (name: string, value: unknown) => boolean;
 	/** プロパティの表示形式をカスタマイズする関数 */

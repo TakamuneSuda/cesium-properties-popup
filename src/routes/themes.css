@@ -1,0 +1,43 @@
+/* ライトテーマ */
+.light-theme {
+	background-color: #f8f9fa !important;
+	color: #333333 !important;
+	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+	padding: 8px !important;
+}
+.light-theme h3 {
+	color: #495057 !important;
+	border-bottom: 1px solid #e9ecef !important;
+	padding-bottom: 0.5rem !important;
+}
+
+/* ダークテーマ */
+.dark-theme {
+	background-color: #333333 !important;
+	color: #ffffff !important;
+	padding: 8px !important;
+}
+.dark-theme h3 {
+	color: #ffffff !important;
+}
+.dark-theme table {
+	color: #ffffff !important;
+}
+
+/* ブランドテーマ */
+.brand-theme {
+	background-color: #ffffff !important;
+	color: #333333 !important;
+	border-left: 4px solid #3498db !important;
+	font-family: 'Roboto', sans-serif !important;
+}
+.brand-theme h3 {
+	background-color: #f5f5f5 !important;
+	color: #3498db !important;
+	padding: 12px !important;
+	margin: 0 !important;
+}
+.brand-theme table {
+	border-collapse: separate !important;
+	border-spacing: 0 2px !important;
+}

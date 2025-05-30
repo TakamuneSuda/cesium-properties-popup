@@ -10,9 +10,6 @@ export interface EntityPopupOptions {
 	/** ホバーでポップアップを表示するかどうか (デフォルト: true) */
 	enableHover?: boolean;
 
-	/** クリック後のホバー制限時間（ミリ秒）(デフォルト: 1000) */
-	clickCooldown?: number;
-
 	/** プロパティをフィルタリングする関数 */
 	filterProperties?: (name: string, value: unknown) => boolean;
 

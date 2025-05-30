@@ -3,7 +3,7 @@ import { POPUP_SETTINGS } from './popupSettings';
 import { entityPositionStrategies } from './entityPositionStrategies';
 
 /**
- * 値がCesiumのPropertyオブジェクトかどうかを判定する型ガード
+ * Type guard to check if a value is a Cesium Property object
  */
 function isCesiumProperty(value: unknown): value is CesiumType.Property {
 	return (
@@ -15,7 +15,7 @@ function isCesiumProperty(value: unknown): value is CesiumType.Property {
 }
 
 /**
- * プロパティにインデックスシグネチャを持たせたPropertyBag型
+ * PropertyBag type with index signature for properties
  */
 export interface PropertyBagWithIndex {
 	[key: string]: unknown;
@@ -24,12 +24,12 @@ export interface PropertyBagWithIndex {
 }
 
 /**
- * 地物の3D座標を取得する関数
- * 戦略パターンを使用して、異なるタイプのエンティティに対応
+ * Function to get the 3D coordinates of a feature
+ * Uses the strategy pattern to handle different types of entities
  *
- * @param entity 座標を取得するエンティティ
- * @param cesium Cesiumライブラリの参照
- * @returns エンティティの3D座標、または取得できない場合はundefined
+ * @param entity The entity to get coordinates from
+ * @param cesium Reference to the Cesium library
+ * @returns The entity's 3D coordinates, or undefined if not available
  */
 export function getEntityPosition(
 	entity: CesiumType.Entity,
@@ -37,7 +37,7 @@ export function getEntityPosition(
 ): CesiumType.Cartesian3 | undefined {
 	if (!entity || !cesium) return undefined;
 
-	// 登録された戦略を順番に試す
+	// Try registered strategies in order
 	for (const strategy of entityPositionStrategies) {
 		if (strategy.isApplicable(entity)) {
 			const position = strategy.getPosition(entity, cesium);
@@ -49,7 +49,7 @@ export function getEntityPosition(
 }
 
 /**
- * 画面上の座標を表すインターフェース
+ * Interface representing screen coordinates
  */
 interface ScreenPosition {
 	x: number;
@@ -57,22 +57,22 @@ interface ScreenPosition {
 }
 
 /**
- * 3D座標をスクリーン座標に変換する関数
+ * Function to convert 3D coordinates to screen coordinates
  *
- * @param position 3D世界座標
- * @param viewer Cesiumビューア
- * @param cesium Cesiumライブラリの参照
- * @param fallbackPosition エラー時の代替位置
- * @returns スクリーン座標、または変換できない場合はundefined
+ * @param position 3D world coordinates
+ * @param viewer Cesium viewer
+ * @param cesium Reference to the Cesium library
+ * @param fallbackPosition Alternative position in case of error
+ * @returns Screen coordinates, or undefined if conversion is not possible
  */
 
-// 最後に計算された位置を保持する静的変数（スムージング用）
+// Static variable to hold the last calculated position (for smoothing)
 let lastCalculatedPosition: ScreenPosition | undefined = undefined;
-// 設定値を読み込み
+// Load settings
 const SMOOTHING_FACTOR = POPUP_SETTINGS.positioning.smoothingFactor;
-// 小さな動きを無視する閾値（ピクセル単位）- 1次フィルター
+// Threshold to ignore small movements (in pixels) - first stage filter
 const MOVEMENT_THRESHOLD = POPUP_SETTINGS.positioning.thresholds.firstStage;
-// 大きな変動と判定する閾値（ピクセル単位）- この値以上の変化は即座に反映
+// Threshold to determine large movements (in pixels) - changes above this value are reflected immediately
 const LARGE_MOVEMENT_THRESHOLD = POPUP_SETTINGS.positioning.thresholds.largeMovement;
 
 export function worldPositionToScreenPosition(
@@ -84,7 +84,7 @@ export function worldPositionToScreenPosition(
 	if (!viewer || !cesium || !position) return undefined;
 
 	try {
-		// 世界座標がビューポート内にあるか確認
+		// Check if world coordinates are within the viewport
 		const inViewport =
 			viewer.scene.camera.frustum
 				.computeCullingVolume(
@@ -94,34 +94,42 @@ export function worldPositionToScreenPosition(
 				)
 				.computeVisibility(new cesium.BoundingSphere(position, 1.0)) !== cesium.Intersect.OUTSIDE;
 
-		// ビューポート外の場合は以前の位置を維持
-		if (!inViewport && fallbackPosition) {
-			return fallbackPosition;
+		// Return undefined and hide popup if entity is outside viewport
+		if (!inViewport) {
+			return undefined;
 		}
 
-		// -------- 3D世界座標からスクリーン座標に変換 --------
-		// まずはstandard変換で試す
+		// -------- Convert 3D world coordinates to screen coordinates --------
+		// First try standard conversion
 		const screenPosition = cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, position);
 
 		if (!screenPosition) {
-			// 標準的な方法が失敗した場合、代替計算を試みる
-			console.warn('標準的な座標変換が失敗、代替計算を試みます');
+			// If standard method fails, try alternative calculation
+			console.warn('Standard coordinate conversion failed, attempting alternative calculation');
 			if (fallbackPosition) return fallbackPosition;
 			return undefined;
 		}
 
-		// 計算された生の座標値（小数点以下を切り捨て）
+		// Calculated raw coordinate values (truncated to integer)
 		const rawX = Math.floor(screenPosition.x);
 		const rawY = Math.floor(screenPosition.y);
 
-		// ビュー外になっていないか確認（画面端のチェック）
+		// Check if not off-screen with margin (check screen edges with buffer)
 		const canvas = viewer.scene.canvas;
-		const isOffscreen =
-			rawX < 0 || rawY < 0 || rawX > canvas.clientWidth || rawY > canvas.clientHeight;
+		// Acceptable margin for off-screen elements (proportion of screen size)
+		const marginFactor = 0.5; // Allow up to 50% of screen size
+		const marginX = canvas.clientWidth * marginFactor;
+		const marginY = canvas.clientHeight * marginFactor;
 
-		// 画面外の場合は前回位置を返す（ポップアップが急に消えるのを防ぐ）
-		if (isOffscreen && fallbackPosition) {
-			return fallbackPosition;
+		const isOffscreen =
+			rawX < -marginX ||
+			rawY < -marginY ||
+			rawX > canvas.clientWidth + marginX ||
+			rawY > canvas.clientHeight + marginY;
+
+		// Return undefined to hide popup if entity is outside acceptable screen margins
+		if (isOffscreen) {
+			return undefined; // Hide popup when entity is too far off-screen
 		}
 
 		// 初回実行時またはfallbackPositionがない場合
@@ -135,7 +143,6 @@ export function worldPositionToScreenPosition(
 			Math.abs(fallbackPosition.x - rawX) > LARGE_MOVEMENT_THRESHOLD ||
 			Math.abs(fallbackPosition.y - rawY) > LARGE_MOVEMENT_THRESHOLD
 		) {
-
 			lastCalculatedPosition = { x: rawX, y: rawY };
 			return lastCalculatedPosition;
 		}
@@ -169,9 +176,9 @@ export function worldPositionToScreenPosition(
 		lastCalculatedPosition = { x: smoothedX, y: smoothedY };
 		return lastCalculatedPosition;
 	} catch (e: unknown) {
-		console.error('座標変換エラー:', e instanceof Error ? e.message : String(e));
+		console.error('Coordinate conversion error:', e instanceof Error ? e.message : String(e));
 
-		// エラー発生時に回復を試みる（可能であれば最後の有効な位置を使用）
+		// Try to recover from error by using the last valid position if available
 		if (fallbackPosition && fallbackPosition.x !== 0 && fallbackPosition.y !== 0) {
 			return fallbackPosition;
 		}
@@ -180,11 +187,11 @@ export function worldPositionToScreenPosition(
 }
 
 /**
- * プロパティの値を文字列形式で取得するヘルパー関数
+ * Helper function to get property value as string
  *
- * @param value 文字列化する値（CesiumのPropertyオブジェクトまたはその他の値）
- * @param cesium Cesiumライブラリの参照（オプション）
- * @returns 文字列化された値
+ * @param value Value to stringify (Cesium Property object or other value)
+ * @param cesium Reference to Cesium library (optional)
+ * @returns Stringified value
  */
 export function formatPropertyValue(value: unknown, cesium?: typeof CesiumType): string {
 	if (value === undefined || value === null) return '';
