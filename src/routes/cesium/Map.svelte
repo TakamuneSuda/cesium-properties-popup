@@ -29,9 +29,6 @@
 				Math: CesiumMath
 			} = cesium;
 
-			// Set access token
-			Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_ION_ACCESS_TOKEN;
-
 			// Configure imagery provider (GSI)
 			const gsiSeamless = new UrlTemplateImageryProvider({
 				url: 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg'
