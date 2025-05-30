@@ -34,11 +34,6 @@
 		};
 		popupOptions.set(newOptions);
 	}
-
-	// Debug log for option updates
-	$effect(() => {
-		console.log('Popup options updated:', $popupOptions);
-	});
 </script>
 
 <div class="flex h-screen w-screen">

@@ -5,6 +5,8 @@
 
 A modern Svelte 5 component library for displaying entity properties on hover or click in CesiumJS. Supports entity types: Points, Polygons, Lines (Polylines)
 
+demo site: [https://d2hgd9m8me42il.cloudfront.net/](https://d2hgd9m8me42il.cloudfront.net/)
+
 ## Table of Contents
 
 - [Installation](#installation)
