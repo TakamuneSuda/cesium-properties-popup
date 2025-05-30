@@ -2,24 +2,54 @@
 	import type * as CesiumType from 'cesium';
 
 	interface Props {
-		// Viewerとcesiumモジュールを親コンポーネントから受け取る
+		// Receive Viewer and cesium module from parent component
 		viewer: CesiumType.Viewer | undefined;
 		cesium: typeof CesiumType | undefined;
 	}
 
 	let { viewer, cesium }: Props = $props();
 
-	// 複数の地物を追加する関数
+	// Function to add data attributions
+	function addDataAttributions(): void {
+		if (!viewer || !cesium) return;
+
+		const { Credit } = cesium;
+
+		const credits = [
+			{
+				text: '<a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-P35.html" target="_blank">国土数値情報（道の駅データ）（国土交通省）</a>を加工して作成',
+				showOnScreen: true
+			},
+			{
+				text: '<a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-2023.html" target="_blank">国土数値情報（鉄道データ）（国土交通省）</a>を加工して作成',
+				showOnScreen: true
+			},
+			{
+				text: '<a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-W09-2005.html" target="_blank">国土数値情報（湖沼データ）（国土交通省）</a>を加工して作成',
+				showOnScreen: true
+			}
+		];
+
+		// Add all credits to the viewer
+		credits.forEach((credit) => {
+			viewer.creditDisplay.addStaticCredit(new Credit(credit.text, credit.showOnScreen));
+		});
+	}
+
+	// Function to add multiple entities
 	async function addEntities(): Promise<void> {
 		if (!viewer || !cesium) {
-			console.error('viewer または cesium が設定されていません');
+			console.error('viewer or cesium is not configured');
 			return;
 		}
 
 		try {
 			const { Color, GeoJsonDataSource } = cesium;
 
-			// ポイントデータを読み込んでエンティティとして追加
+			// Add data attributions first
+			addDataAttributions();
+
+			// Load point data and add as entities
 			const pointsDataSource = await GeoJsonDataSource.load('/sample/points.geojson');
 			pointsDataSource.entities.values.forEach((entity) => {
 				const position = entity.position?.getValue(new cesium.JulianDate());
@@ -40,7 +70,7 @@
 				}
 			});
 
-			// ライン（路線）データを読み込む
+			// Load line (route) data
 			const linesDataSource = await GeoJsonDataSource.load('/sample/lines.geojson');
 			linesDataSource.entities.values.forEach((entity) => {
 				viewer.entities.add({
@@ -50,14 +80,14 @@
 						positions: entity.polyline?.positions,
 						width: 3,
 						material: new cesium.ColorMaterialProperty(Color.YELLOW),
-						clampToGround: false,
+						clampToGround: true,
 						classificationType: cesium.ClassificationType.BOTH
 					},
 					properties: entity.properties
 				});
 			});
 
-			// ポリゴンデータを読み込む
+			// Load polygon data
 			const polygonsDataSource = await GeoJsonDataSource.load('/sample/polygons.geojson');
 			polygonsDataSource.entities.values.forEach((entity) => {
 				viewer.entities.add({
@@ -68,24 +98,20 @@
 						material: Color.BLUE.withAlpha(0.5),
 						outline: true,
 						outlineColor: Color.WHITE,
-						clampToGround: true
+						heightReference: cesium.HeightReference.CLAMP_TO_GROUND
 					},
 					properties: entity.properties
 				});
 			});
 		} catch (error) {
-			console.error('エンティティの追加に失敗しました:', error);
+			console.error('Failed to add entities:', error);
 		}
 	}
 
-	// viewerとcesiumが設定されたら地物を追加
+	// Add entities when viewer and cesium are configured
 	$effect(() => {
 		if (viewer && cesium) {
 			addEntities();
-			// この$effectはエンティティを追加するだけなので、通常クリーンアップは不要です。
-			// エンティティはviewerインスタンスに属し、コンポーネントが破棄されてもviewerが存続する限り残ります。
-			// もしこのコンポーネントが破棄される際にエンティティを削除する必要がある場合は、
-			// return () => { /* remove entities logic */ }; のようにクリーンアップ関数を定義します。
 		}
 	});
 </script>

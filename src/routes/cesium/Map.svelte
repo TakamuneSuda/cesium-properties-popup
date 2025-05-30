@@ -4,21 +4,11 @@
 	import { CESIUM_INITIAL_OPTIONS } from './cesiumUtil';
 	import type * as CesiumType from 'cesium';
 	import Entities from './Entities.svelte';
-	// ライブラリからEntityPopupとバージョン情報をインポート
 	import { EntityPopup as LibraryEntityPopup } from '$lib';
 
 	let { popupOptions } = $props();
 
-	// デバッグログを追加
-	$effect(() => {
-		console.log('PopupOptions詳細:', {
-			...popupOptions,
-			entityTypes: popupOptions?.entityTypes,
-			propertyNames: popupOptions?.propertyNames
-		});
-	});
-
-	// クリックイベントのハンドラー
+	// Click event handler
 	function handleClick(e: MouseEvent) {
 		if (viewer && cesium) {
 			const pick = viewer.scene.pick(new cesium.Cartesian2(e.clientX, e.clientY));
@@ -36,89 +26,84 @@
 		}
 	}
 
-	// Cesium モジュールは動的インポートするので、型は import 型を利用
+	// Cesium module is dynamically imported, so use import type
 	let cesium: typeof CesiumType | undefined = $state();
 	let viewer: CesiumType.Viewer | undefined = $state();
-	let viewerReady = $state(false); // viewer の準備状態を追跡するフラグ
+	let viewerReady = $state(false); // Flag to track viewer readiness
 
 	onMount(async (): Promise<void> => {
 		if (!browser) return;
 
 		try {
-			// ブラウザ上でのみ Cesium モジュールを動的にインポート
+			// Import Cesium module only in browser
 			cesium = (await import('cesium')) as typeof CesiumType;
 			await import('cesium/Build/Cesium/Widgets/widgets.css');
 
-			// Cesium モジュールから必要なエクスポートを取得
+			// Get necessary exports from Cesium module
 			const {
 				Ion,
 				UrlTemplateImageryProvider,
 				Viewer: CesiumViewer,
-				CesiumTerrainProvider,
-				IonResource,
 				Cartesian3,
 				Math: CesiumMath
 			} = cesium;
 
-			// アクセストークンの設定
-			Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_ION_ACCESS_TOKEN_PLATEAU_TERRAIN;
+			// Set access token
+			Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_ION_ACCESS_TOKEN;
 
-			// 画像プロバイダーの設定（GSI）
+			// Configure imagery provider (GSI)
 			const gsiSeamless = new UrlTemplateImageryProvider({
 				url: 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg'
 			});
 
-			// CESIUM_BASE_URL の設定
+			// Configure CESIUM_BASE_URL
 			const baseUrl = import.meta.env.DEV ? '/node_modules/cesium/Build/Cesium/' : '/Cesium/';
-			// @ts-expect-error - CesiumのためのグローバルCESIUM_BASE_URL設定
+			// @ts-expect-error - Global CESIUM_BASE_URL setting for Cesium
 			window.CESIUM_BASE_URL = baseUrl;
 
-			// Viewer の初期化（viewer 変数に代入）
+			// Initialize Viewer (assign to viewer variable)
 			viewer = new CesiumViewer('cesiumContainer', {
 				...CESIUM_INITIAL_OPTIONS
 			});
 
-			// 地形プロバイダーの設定
-			viewer.terrainProvider = await CesiumTerrainProvider.fromUrl(
-				IonResource.fromAssetId(770371, {})
-			);
+			// Configure terrain provider
+			viewer.terrainProvider = await cesium.createWorldTerrainAsync();
 
-			// 画像プロバイダーを追加
+			// Add imagery provider
 			viewer.imageryLayers.addImageryProvider(gsiSeamless);
 
-			// カメラの初期位置を設定
+			// Set initial camera position
 			viewer.camera.setView({
 				destination: Cartesian3.fromDegrees(
-					139.754409, // 経度
-					35.670355, // 緯度
-					5000 // 高度（メートル）
+					139.754409, // Longitude
+					35.670355, // Latitude
+					5000 // Altitude (meters)
 				),
 				orientation: {
-					heading: CesiumMath.toRadians(0), // 視点の向き（ヘディング）
-					pitch: CesiumMath.toRadians(-30), // ピッチ（傾き）
-					roll: 0 // ロール（回転）
+					heading: CesiumMath.toRadians(0), // View direction (heading)
+					pitch: CesiumMath.toRadians(-30), // Pitch (tilt)
+					roll: 0 // Roll (rotation)
 				}
 			});
-
-			// 透過させないようにする
+			// Disable transparency against terrain
 			viewer.scene.globe.depthTestAgainstTerrain = false;
 
-			// viewerの準備ができたことを示す
+			// Indicate that viewer is ready
 			viewerReady = true;
 		} catch (error) {
-			console.error('Cesium の初期化に失敗しました:', error);
+			console.error('Failed to initialize Cesium:', error);
 		}
 	});
 </script>
 
-<!-- デバッグ用のクリックイベントリスナー -->
+<!-- Debug click event listener -->
 <svelte:window on:click={handleClick} />
 
-<!-- Cesium を描画するコンテナ -->
+<!-- Container for rendering Cesium -->
 <div id="cesiumContainer" class="h-full w-full"></div>
-<!-- viewerが準備できたらEntitiesコンポーネントとEntityPopupを表示 -->
+<!-- Display Entities component and EntityPopup when viewer is ready -->
 {#if viewerReady && viewer && cesium}
 	<Entities {viewer} {cesium} />
-	<!-- ライブラリのEntityPopupコンポーネントを使用 -->
+	<!-- Use library's EntityPopup component -->
 	<LibraryEntityPopup {viewer} {cesium} options={popupOptions} />
 {/if}

@@ -1,4 +1,4 @@
-// 表示内容の初期値
+// Initial values for display settings
 export const CESIUM_INITIAL_OPTIONS = {
 	animation: false,
 	baseLayerPicker: false,

@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/cesium-properties-popup.svg)](https://www.npmjs.com/package/cesium-properties-popup)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A Svelte component library for displaying entity properties on hover or click in CesiumJS. Supports entity types including Points, Polygons, Lines (Polylines).
+A modern Svelte 5 component library for displaying entity properties on hover or click in CesiumJS. Supports entity types: Points, Polygons, Lines (Polylines)
 
 ## Table of Contents
 
@@ -43,20 +43,53 @@ npm install cesium svelte
 
 ```svelte
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import { EntityPopup } from 'cesium-properties-popup';
 	import type * as CesiumType from 'cesium';
 
-	let viewer: CesiumType.Viewer;
-	let cesium: typeof CesiumType;
+	// Cesium module is dynamically imported, so use import type
+	let cesium: typeof CesiumType | undefined = $state();
+	let viewer: CesiumType.Viewer | undefined = $state();
+	let viewerReady = $state(false);
 
-	// Cesium viewer initialization (omitted)
+	onMount(async (): Promise<void> => {
+		if (!browser) return;
+
+		try {
+			// Import Cesium module only in browser
+			cesium = (await import('cesium')) as typeof CesiumType;
+			await import('cesium/Build/Cesium/Widgets/widgets.css');
+
+			// Get necessary exports from Cesium module
+			const { Ion, Viewer: CesiumViewer, Cartesian3 } = cesium;
+
+			// Set access token
+			Ion.defaultAccessToken = 'your_cesium_ion_access_token';
+
+			// Initialize Viewer
+			viewer = new CesiumViewer('cesiumContainer');
+
+			// Set initial camera position
+			viewer.camera.setView({
+				destination: Cartesian3.fromDegrees(139.754409, 35.670355, 5000)
+			});
+
+			// Indicate that viewer is ready
+			viewerReady = true;
+		} catch (error) {
+			console.error('Failed to initialize Cesium:', error);
+		}
+	});
 </script>
 
-<!-- Set up Cesium viewer -->
-<div id="cesiumContainer" />
+<!-- Container for rendering Cesium -->
+<div id="cesiumContainer" class="h-full w-full"></div>
 
-<!-- Simplest usage -->
-<EntityPopup {viewer} {cesium} />
+<!-- Display EntityPopup when viewer is ready -->
+{#if viewerReady && viewer && cesium}
+	<EntityPopup {viewer} {cesium} />
+{/if}
 ```
 
 The EntityPopup component automatically displays properties of Cesium entities when users hover over them or click on them in the scene.
@@ -88,10 +121,18 @@ npm run build   # Rebuild the library
 ## Customization Options
 
 ```svelte
-<EntityPopup
-	{viewer}
-	{cesium}
-	options={{
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
+	import { EntityPopup } from 'cesium-properties-popup';
+	import type * as CesiumType from 'cesium';
+
+	let cesium: typeof CesiumType | undefined = $state();
+	let viewer: CesiumType.Viewer | undefined = $state();
+	let viewerReady = $state(false);
+
+	// Popup options with custom settings
+	const popupOptions = {
 		// Enable/disable hover behavior (default: true)
 		enableHover: true,
 
@@ -106,8 +147,22 @@ npm run build   # Rebuild the library
 			backgroundColor: '#ffffff',
 			overflowY: 'auto'
 		}
-	}}
-/>
+	};
+
+	onMount(async (): Promise<void> => {
+		if (!browser) return;
+		// Cesium initialization code (see Basic Usage example)
+		// ...
+	});
+</script>
+
+<!-- Container for rendering Cesium -->
+<div id="cesiumContainer" class="h-full w-full"></div>
+
+<!-- EntityPopup with custom options -->
+{#if viewerReady && viewer && cesium}
+	<EntityPopup {viewer} {cesium} options={popupOptions} />
+{/if}
 ```
 
 ### Options API
@@ -200,36 +255,57 @@ You can use individual components as needed for more custom implementations:
 
 ```svelte
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import { PopupPositioner, PopupContent } from 'cesium-properties-popup';
 	import type * as CesiumType from 'cesium';
 
-	let viewer: CesiumType.Viewer;
-	let cesium: typeof CesiumType;
-	let selectedEntity: CesiumType.Entity | undefined;
-	let isPopupOpen = false;
+	let cesium: typeof CesiumType | undefined = $state();
+	let viewer: CesiumType.Viewer | undefined = $state();
+	let selectedEntity: CesiumType.Entity | undefined = $state();
+	let isPopupOpen = $state(false);
+
+	onMount(async (): Promise<void> => {
+		if (!browser) return;
+
+		try {
+			// Import Cesium module
+			cesium = (await import('cesium')) as typeof CesiumType;
+			await import('cesium/Build/Cesium/Widgets/widgets.css');
+
+			const { Viewer: CesiumViewer, ScreenSpaceEventHandler, ScreenSpaceEventType } = cesium;
+
+			// Initialize viewer
+			viewer = new CesiumViewer('cesiumContainer');
+
+			// Custom event handler setup
+			const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
+			handler.setInputAction((click) => {
+				const pickedObject = viewer.scene.pick(click.position);
+				if (cesium.defined(pickedObject) && pickedObject.id instanceof cesium.Entity) {
+					handleEntitySelect(pickedObject.id);
+				}
+			}, ScreenSpaceEventType.LEFT_CLICK);
+		} catch (error) {
+			console.error('Failed to initialize Cesium:', error);
+		}
+	});
 
 	// Custom entity selection logic
-	function handleEntitySelect(entity) {
+	function handleEntitySelect(entity: CesiumType.Entity) {
 		selectedEntity = entity;
 		isPopupOpen = true;
 	}
-
-	// Custom event handler setup
-	const handler = new cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-	handler.setInputAction((click) => {
-		const pickedObject = viewer.scene.pick(click.position);
-		if (cesium.defined(pickedObject) && pickedObject.id instanceof cesium.Entity) {
-			handleEntitySelect(pickedObject.id);
-		}
-	}, cesium.ScreenSpaceEventType.LEFT_CLICK);
 </script>
 
-{#if isPopupOpen && selectedEntity}
+<div id="cesiumContainer" class="h-full w-full"></div>
+
+{#if isPopupOpen && selectedEntity && viewer && cesium}
 	<PopupPositioner {viewer} {cesium} entity={selectedEntity} {isPopupOpen}>
 		<div class="custom-popup">
 			<PopupContent entity={selectedEntity} {cesium} />
 			<div class="actions">
-				<button on:click={() => (isPopupOpen = false)}>Close</button>
+				<button onclick={() => (isPopupOpen = false)}>Close</button>
 			</div>
 		</div>
 	</PopupPositioner>
@@ -308,15 +384,31 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // Change camera cha
 1. **Theme-specific styling**
 
    ```svelte
-   <EntityPopup
-   	{viewer}
-   	{cesium}
-   	options={{
+   <script lang="ts">
+   	import { onMount } from 'svelte';
+   	import { browser } from '$app/environment';
+   	import { EntityPopup } from 'cesium-properties-popup';
+   	import type * as CesiumType from 'cesium';
+
+   	let cesium: typeof CesiumType | undefined = $state();
+   	let viewer: CesiumType.Viewer | undefined = $state();
+   	let viewerReady = $state(false);
+
+   	const popupOptions = {
    		styleOptions: {
    			popupClass: 'brand-theme'
    		}
-   	}}
-   />
+   	};
+
+   	onMount(async (): Promise<void> => {
+   		// Cesium initialization (see Basic Usage example)
+   		// ...
+   	});
+   </script>
+
+   {#if viewerReady && viewer && cesium}
+   	<EntityPopup {viewer} {cesium} options={popupOptions} />
+   {/if}
 
    <style>
    	:global(.brand-theme) {
@@ -337,23 +429,38 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // Change camera cha
 
    ```svelte
    <script lang="ts">
+   	import { onMount } from 'svelte';
+   	import { browser } from '$app/environment';
    	import { EntityPopup } from 'cesium-properties-popup';
-
-   	let theme = 'light';
-
+   	import type * as CesiumType from 'cesium';
+   
+   	let cesium: typeof CesiumType | undefined = $state();
+   	let viewer: CesiumType.Viewer | undefined = $state();
+   	let viewerReady = $state(false);
+   	let theme = $state('light');
+   
    	function toggleTheme() {
    		theme = theme === 'light' ? 'dark' : 'light';
    	}
-
-   	$: popupOptions = {
+   
+   	// Reactive popup options based on theme
+   	$derived const popupOptions = {
    		styleOptions: {
    			popupClass: theme === 'light' ? 'light-theme' : 'dark-theme'
    		}
    	};
+   
+   	onMount(async (): Promise<void> => {
+   		// Cesium initialization (see Basic Usage example)
+   		// ...
+   	});
    </script>
 
-   <button on:click={toggleTheme}>Toggle Theme</button>
-   <EntityPopup {viewer} {cesium} options={popupOptions} />
+   <button onclick={toggleTheme}>Toggle Theme</button>
+
+   {#if viewerReady && viewer && cesium}
+   	<EntityPopup {viewer} {cesium} options={popupOptions} />
+   {/if}
 
    <style>
    	:global(.light-theme) {
@@ -373,7 +480,9 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // Change camera cha
 1. **Real estate data display**
 
    ```svelte
-   <script>
+   <script lang="ts">
+   	const importantProperties = ['price', 'area', 'bedrooms', 'bathrooms', 'type'];
+
    	const popupOptions = {
    		filterProperties: (name) => importantProperties.includes(name)
    	};
@@ -383,7 +492,7 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // Change camera cha
 2. **Time-series data display**
 
    ```svelte
-   <script>
+   <script lang="ts">
    	// For time-series data, focus on more relevant information with filtering
    	const popupOptions = {
    		filterProperties: (name) =>
@@ -391,6 +500,66 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // Change camera cha
    	};
    </script>
    ```
+
+3. **Adding data attributions**
+
+   ```svelte
+   <script lang="ts">
+   	import { onMount } from 'svelte';
+   	import type * as CesiumType from 'cesium';
+
+   	let cesium: typeof CesiumType | undefined = $state();
+   	let viewer: CesiumType.Viewer | undefined = $state();
+
+   	function addDataAttributions(): void {
+   		if (!viewer || !cesium) return;
+
+   		const { Credit } = cesium;
+
+   		const credits = [
+   			{
+   				text: '<a href="https://example.com/data-source" target="_blank">Data Source Name</a>',
+   				showOnScreen: true
+   			}
+   		];
+
+   		credits.forEach((credit) => {
+   			viewer.creditDisplay.addStaticCredit(new Credit(credit.text, credit.showOnScreen));
+   		});
+   	}
+
+   	onMount(async (): Promise<void> => {
+   		// After viewer initialization
+   		addDataAttributions();
+   	});
+   </script>
+   ```
+
+## Changelog
+
+### v0.1.1 (2025-05-30)
+
+**🐛 Bug Fixes**
+
+- **Fixed line entity popup support**: Added `PolylineStrategy` to enable popup functionality for line (polyline) entities
+  - Previously, popups would not display for line entities due to missing position calculation strategy
+  - Implemented midpoint calculation for polyline entities to determine popup position
+  - All major Cesium entity types (Points, Polygons, Lines) now fully supported
+
+**🔧 Architecture Improvements**
+
+- Enhanced entity position strategy system with proper polyline support
+- Improved code organization by moving data attributions to entity components
+- Updated documentation with latest implementation patterns
+
+### v0.1.0 (Initial Release)
+
+**✨ Features**
+
+- Initial release with support for Point and Polygon entity popups
+- Configurable hover and click interactions
+- Customizable styling and property filtering
+- TypeScript support with comprehensive type definitions
 
 ## License
 
