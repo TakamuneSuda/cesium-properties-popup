@@ -99,11 +99,8 @@ The EntityPopup component automatically displays properties of Cesium entities w
 This library supports various Cesium entity types:
 
 - ✅ **Points**
-- ✅ **Polygons**
 - ✅ **Lines (Polylines)**
-- ✅ **Billboards**
-- ✅ **3D Models**
-- ✅ **Other entity types**
+- ✅ **Polygons**
 
 ## Development Setup
 
@@ -534,32 +531,6 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // Change camera cha
    	});
    </script>
    ```
-
-## Changelog
-
-### v0.1.1 (2025-05-30)
-
-**🐛 Bug Fixes**
-
-- **Fixed line entity popup support**: Added `PolylineStrategy` to enable popup functionality for line (polyline) entities
-  - Previously, popups would not display for line entities due to missing position calculation strategy
-  - Implemented midpoint calculation for polyline entities to determine popup position
-  - All major Cesium entity types (Points, Polygons, Lines) now fully supported
-
-**🔧 Architecture Improvements**
-
-- Enhanced entity position strategy system with proper polyline support
-- Improved code organization by moving data attributions to entity components
-- Updated documentation with latest implementation patterns
-
-### v0.1.0 (Initial Release)
-
-**✨ Features**
-
-- Initial release with support for Point and Polygon entity popups
-- Configurable hover and click interactions
-- Customizable styling and property filtering
-- TypeScript support with comprehensive type definitions
 
 ## License
 
