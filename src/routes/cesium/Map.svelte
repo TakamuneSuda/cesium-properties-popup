@@ -7,25 +7,6 @@
 	import { EntityPopup as LibraryEntityPopup } from '$lib';
 
 	let { popupOptions } = $props();
-
-	// Click event handler
-	function handleClick(e: MouseEvent) {
-		if (viewer && cesium) {
-			const pick = viewer.scene.pick(new cesium.Cartesian2(e.clientX, e.clientY));
-			console.log('Picked object:', pick);
-			if (pick?.id) {
-				console.log('Entity details:', {
-					id: pick.id.id,
-					name: pick.id.name,
-					properties: pick.id.properties,
-					type: pick.id.constructor.name,
-					hasPolyline: !!pick.id.polyline,
-					primitive: pick.primitive?.constructor.name
-				});
-			}
-		}
-	}
-
 	// Cesium module is dynamically imported, so use import type
 	let cesium: typeof CesiumType | undefined = $state();
 	let viewer: CesiumType.Viewer | undefined = $state();
@@ -95,9 +76,6 @@
 		}
 	});
 </script>
-
-<!-- Debug click event listener -->
-<svelte:window on:click={handleClick} />
 
 <!-- Container for rendering Cesium -->
 <div id="cesiumContainer" class="h-full w-full"></div>
