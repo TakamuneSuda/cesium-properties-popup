@@ -25,8 +25,11 @@
 				UrlTemplateImageryProvider,
 				Viewer: CesiumViewer,
 				Cartesian3,
-				Math: CesiumMath
+				Math: CesiumMath,
+				Ion
 			} = cesium;
+
+			Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_ION_ACCESS_TOKEN;
 
 			// Configure imagery provider (GSI)
 			const gsiSeamless = new UrlTemplateImageryProvider({
