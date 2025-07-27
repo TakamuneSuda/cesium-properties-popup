@@ -35,20 +35,12 @@
 		target={displayOptions.linkTarget || '_blank'}
 		rel="noopener noreferrer"
 		class="text-blue-600 underline hover:text-blue-800"
+		aria-label={`Open link: ${displayValue}`}
 	>
 		{displayValue}
 	</a>
 {:else if displayType === 'image'}
-	{#if displayOptions.imageFullWidth}
-		<img src={displayValue} alt="" style="width: 100%; height: auto;" class="block" />
-	{:else}
-		<img
-			src={displayValue}
-			alt=""
-			style={`max-width: ${displayOptions.imageMaxWidth || 200}px; max-height: ${displayOptions.imageMaxHeight || 150}px;`}
-			class="block"
-		/>
-	{/if}
+	<img src={displayValue} alt="" style="width: 100%; height: auto;" class="block" />
 {:else if displayType === 'email'}
 	<a href={`mailto:${displayValue}`} class="text-blue-600 underline hover:text-blue-800">
 		{displayValue}

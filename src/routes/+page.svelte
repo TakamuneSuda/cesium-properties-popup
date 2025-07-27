@@ -65,8 +65,7 @@
 			code: 'Image',
 			name: 'Image',
 			selected: true,
-			displayType: 'image',
-			displayOptions: { imageFullWidth: true }
+			displayType: 'image'
 		},
 		{ code: 'Email', name: 'Email Address', selected: true, displayType: 'email' }
 	];
@@ -529,8 +528,7 @@
 						code: 'Image',
 						name: 'Image',
 						selected: true,
-						displayType: 'image',
-						displayOptions: { imageFullWidth: true }
+						displayType: 'image'
 					},
 					{ code: 'Email', name: 'Email Address', selected: true, displayType: 'email' }
 				];

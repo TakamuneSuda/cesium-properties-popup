@@ -18,15 +18,6 @@ export type PropertyDisplayType =
 export interface PropertyDisplayOptions {
 	/** リンクのターゲット（_blank, _self など） */
 	linkTarget?: string;
-
-	/** 画像の最大幅（ピクセル） */
-	imageMaxWidth?: number;
-
-	/** 画像の最大高さ（ピクセル） */
-	imageMaxHeight?: number;
-
-	/** 画像の幅を100%にするかどうか */
-	imageFullWidth?: boolean;
 }
 
 /**
