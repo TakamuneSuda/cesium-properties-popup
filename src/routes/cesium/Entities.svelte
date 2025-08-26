@@ -103,6 +103,27 @@
 					properties: entity.properties
 				});
 			});
+
+			// Load contents data
+			const contentsDataSource = await GeoJsonDataSource.load('/sample/contents.geojson');
+			contentsDataSource.entities.values.forEach((entity) => {
+				const position = entity.position?.getValue(new cesium.JulianDate());
+				if (position) {
+					viewer.entities.add({
+						id: entity.id,
+						name: entity.name,
+						position: position,
+						point: {
+							pixelSize: 10,
+							color: Color.RED,
+							outlineColor: Color.WHITE,
+							outlineWidth: 2,
+							heightReference: cesium.HeightReference.CLAMP_TO_GROUND
+						},
+						properties: entity.properties
+					});
+				}
+			});
 		} catch (error) {
 			console.error('Failed to add entities:', error);
 		}

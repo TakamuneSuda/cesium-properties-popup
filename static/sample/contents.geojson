@@ -1,0 +1,31 @@
+{
+	"type": "FeatureCollection",
+	"features": [
+		{
+			"type": "Feature",
+			"properties": {
+				"name": "Tokyo Station",
+				"HP": "https://www.jreast.co.jp/estation/stations/1039.html",
+				"Image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Tokyo-STA_Marunouchi-Entrance_2023.jpg/960px-Tokyo-STA_Marunouchi-Entrance_2023.jpg",
+				"Email": "hogehoge@example.com"
+			},
+			"geometry": {
+				"coordinates": [139.76649385316057, 35.68134613100531],
+				"type": "Point"
+			}
+		},
+		{
+			"type": "Feature",
+			"properties": {
+				"name": "Jimbocho Station",
+				"HP": "https://www.tokyometro.jp/station/jimbocho/index.html",
+				"Image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Jimbocho-Sta-A3.JPG/960px-Jimbocho-Sta-A3.JPG",
+				"Email": "hogehoge@example.com"
+			},
+			"geometry": {
+				"coordinates": [139.75806156668415, 35.69549100997547],
+				"type": "Point"
+			}
+		}
+	]
+}

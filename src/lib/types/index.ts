@@ -4,14 +4,37 @@
 import type * as Cesium from 'cesium';
 
 /**
+ * プロパティの表示タイプ
+ */
+export type PropertyDisplayType =
+	| 'text' // 通常のテキスト（デフォルト）
+	| 'link' // ハイパーリンク
+	| 'image' // 画像
+	| 'email'; // メールアドレス
+
+/**
+ * プロパティ設定の型定義
+ */
+export interface PropertyConfig {
+	/** プロパティ名 */
+	name: string;
+
+	/** 表示名（オプション） */
+	displayName?: string;
+
+	/** 表示タイプ */
+	displayType?: PropertyDisplayType;
+}
+
+/**
  * EntityPopupコンポーネントのオプション
  */
 export interface EntityPopupOptions {
 	/** ホバーでポップアップを表示するかどうか (デフォルト: true) */
 	enableHover?: boolean;
 
-	/** プロパティをフィルタリングする関数 */
-	filterProperties?: (name: string, value: unknown) => boolean;
+	/** 表示するプロパティのホワイトリスト */
+	properties?: PropertyConfig[] | string[];
 
 	/** ポップアップのCSS設定 */
 	styleOptions?: {

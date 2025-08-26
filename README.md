@@ -12,6 +12,7 @@ demo site: [https://d2hgd9m8me42il.cloudfront.net/](https://d2hgd9m8me42il.cloud
 - [Installation](#installation)
 - [Basic Usage](#basic-usage)
 - [Supported Entity Types](#supported-entity-types)
+- [Property Selection and Display Types](#property-selection-and-display-types)
 - [Customization Options](#customization-options)
 - [Styling](#styling)
 - [Component Architecture](#component-architecture)
@@ -19,7 +20,7 @@ demo site: [https://d2hgd9m8me42il.cloudfront.net/](https://d2hgd9m8me42il.cloud
 - [Advanced Usage](#advanced-usage)
 - [Utility Functions](#utility-functions)
 - [Implementation Guidelines](#implementation-guidelines)
-- [Changelog](#changelog)
+- [License](#license)
 
 ## Installation
 
@@ -104,6 +105,98 @@ This library supports various Cesium entity types:
 - ✅ **Lines (Polylines)**
 - ✅ **Polygons**
 
+## Property Selection and Display Types
+
+### Property Selection with Whitelist Mode
+
+You can control which properties are displayed in the popup and in what order by using the `properties` option:
+
+```svelte
+<script lang="ts">
+	import { EntityPopup } from 'cesium-properties-popup';
+	import type { PropertyConfig } from 'cesium-properties-popup';
+
+	// Simple string array - displays properties in the order specified
+	const simpleWhitelist = ['name', 'description', 'value'];
+
+	// Advanced configuration with display names and types
+	const advancedWhitelist: PropertyConfig[] = [
+		// Simple text property with custom display name
+		{ name: 'name', displayName: 'Name' },
+		
+		// Hyperlink display
+		{
+			name: 'website',
+			displayName: 'Website',
+			displayType: 'link'
+		},
+		
+		// Image display
+		{
+			name: 'imageUrl',
+			displayName: 'Preview',
+			displayType: 'image'
+		},
+		
+		// Email link
+		{
+			name: 'contact',
+			displayName: 'Email',
+			displayType: 'email'
+		}
+	];
+
+	const popupOptions = {
+		properties: advancedWhitelist
+	};
+</script>
+
+{#if viewerReady && viewer && cesium}
+	<EntityPopup {viewer} {cesium} options={popupOptions} />
+{/if}
+```
+
+### Display Types
+
+The library supports several display types for properties:
+
+| Display Type | Description | Example |
+|--------------|-------------|---------|
+| `text` | Default text display | Plain property value |
+| `link` | Clickable hyperlink | Opens in new tab/window |
+| `image` | Image display | Shows image with 100% width |
+| `email` | Email link | Creates mailto: link |
+
+### Example with Mixed Display Types
+
+```typescript
+const propertyConfig: PropertyConfig[] = [
+	// Regular text property
+	{ name: 'stationName', displayName: 'Station' },
+	
+	// Hyperlink that opens in new tab
+	{
+		name: 'homepageUrl',
+		displayName: 'Homepage',
+		displayType: 'link'
+	},
+	
+	// Image that displays at full width
+	{
+		name: 'photoUrl',
+		displayName: 'Photo',
+		displayType: 'image'
+	},
+	
+	// Email address with mailto link
+	{
+		name: 'contactEmail',
+		displayName: 'Contact',
+		displayType: 'email'
+	}
+];
+```
+
 ## Development Setup
 
 If you encounter cache-related issues during development or debugging, you can clear the cache and rebuild using the following commands:
@@ -135,8 +228,12 @@ npm run build   # Rebuild the library
 		// Enable/disable hover behavior (default: true)
 		enableHover: true,
 
-		// Property filtering function
-		filterProperties: (name, value) => !name.startsWith('_'),
+		// Property selection and configuration
+		properties: [
+			{ name: 'name', displayName: 'Name' },
+			{ name: 'type', displayName: 'Type' },
+			{ name: 'value', displayName: 'Value' }
+		],
 
 		// Style options
 		styleOptions: {
@@ -169,7 +266,7 @@ npm run build   # Rebuild the library
 | Option             | Type     | Default     | Description                                       |
 | ------------------ | -------- | ----------- | ------------------------------------------------- |
 | `enableHover`      | boolean  | `true`      | Enable popup display on hover                     |
-| `filterProperties` | function | `undefined` | Function to filter which properties are displayed |
+| `properties`       | PropertyConfig[] \| string[] | `undefined` | Whitelist of properties to display with optional configuration |
 | `styleOptions`     | object   | `{}`        | Style configuration for the popup                 |
 
 #### Style Options
@@ -215,23 +312,49 @@ This library consists of these main components:
 - `EntityPopup`: The main component that manages entity popups on a Cesium viewer.
 - `PopupPositioner`: A component that calculates and updates popup positions, automatically adjusting based on camera movements and entity position changes.
 - `PopupContent`: A component that displays the popup content, showing entity names, descriptions, and properties.
+- `PropertyValue`: A component that renders property values according to their display type.
 
 ### Entity Position Strategy System
 
 The library uses a **Strategy Pattern** to handle different entity types:
 
 - `PointStrategy`: Uses direct position for point entities
-- `PolylineStrategy`: **[NEW]** Calculates midpoint for line entities
+- `PolylineStrategy`: Calculates midpoint for line entities
 - `PolygonStrategy`: Calculates center point using bounding sphere for polygon entities
 
 ## Type Definitions
 
 ```typescript
-interface EntityPopupOptions {
+/**
+ * Property display types
+ */
+export type PropertyDisplayType =
+	| 'text'    // Regular text (default)
+	| 'link'    // Hyperlink
+	| 'image'   // Image
+	| 'email';  // Email address
+
+
+/**
+ * Property configuration
+ */
+export interface PropertyConfig {
+	/** Property name */
+	name: string;
+	/** Display name (optional) */
+	displayName?: string;
+	/** Display type */
+	displayType?: PropertyDisplayType;
+}
+
+/**
+ * EntityPopup component options
+ */
+export interface EntityPopupOptions {
 	/** Whether to show popup on hover */
 	enableHover?: boolean;
-	/** Function to filter properties */
-	filterProperties?: (name: string, value: unknown) => boolean;
+	/** Properties whitelist configuration */
+	properties?: PropertyConfig[] | string[];
 	/** Popup CSS settings */
 	styleOptions?: {
 		/** Popup width in pixels */
@@ -346,35 +469,47 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // Change camera cha
 
 ## Implementation Guidelines and Best Practices
 
+### Working with GeoJSON Data
+
+When loading GeoJSON data with custom properties:
+
+```typescript
+// Load GeoJSON with custom properties
+const dataSource = await Cesium.GeoJsonDataSource.load('/data/locations.geojson');
+viewer.dataSources.add(dataSource);
+
+// Configure popup to display specific properties
+const popupOptions = {
+	properties: [
+		{ name: 'name', displayName: 'Location Name' },
+		{ name: 'website', displayName: 'Website', displayType: 'link' },
+		{ name: 'photo', displayName: 'Photo', displayType: 'image' },
+		{ name: 'email', displayName: 'Contact', displayType: 'email' }
+	]
+};
+```
+
 ### Performance Optimization
 
 1. **When dealing with many entities**
 
    ```typescript
-   // Limit displayed properties using filtering
+   // Use property whitelist to limit displayed properties
    const popupOptions = {
-   	filterProperties: (name, value) => {
-   		// Show only important properties
-   		const importantProps = ['name', 'type', 'value', 'category'];
-   		return importantProps.includes(name);
-   	}
+   	properties: ['name', 'type', 'value', 'category']
    };
    ```
 
 2. **For entities with complex properties**
 
    ```typescript
-   // Optimize display for entities with large JSON properties
+   // Display only essential properties
    const popupOptions = {
-   	filterProperties: (name, value) => {
-   		// Exclude large objects or complex data structures
-   		if (typeof value === 'object' && value !== null) {
-   			if (name === 'attributes' || name === 'metadata') {
-   				return false; // Exclude complex data
-   			}
-   		}
-   		return true;
-   	}
+   	properties: [
+   		{ name: 'id', displayName: 'ID' },
+   		{ name: 'status', displayName: 'Status' },
+   		{ name: 'lastUpdated', displayName: 'Last Updated' }
+   	]
    };
    ```
 
@@ -443,11 +578,11 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // Change camera cha
    	}
    
    	// Reactive popup options based on theme
-   	$derived const popupOptions = {
+   	const popupOptions = $derived({
    		styleOptions: {
    			popupClass: theme === 'light' ? 'light-theme' : 'dark-theme'
    		}
-   	};
+   	});
    
    	onMount(async (): Promise<void> => {
    		// Cesium initialization (see Basic Usage example)
@@ -478,26 +613,30 @@ defaultSettings.updateFrequency.cameraChangeThrottle = 150; // Change camera cha
 
 1. **Real estate data display**
 
-   ```svelte
-   <script lang="ts">
-   	const importantProperties = ['price', 'area', 'bedrooms', 'bathrooms', 'type'];
-
-   	const popupOptions = {
-   		filterProperties: (name) => importantProperties.includes(name)
-   	};
-   </script>
+   ```typescript
+   const popupOptions = {
+   	properties: [
+   		{ name: 'address', displayName: 'Address' },
+   		{ name: 'price', displayName: 'Price' },
+   		{ name: 'area', displayName: 'Area (m²)' },
+   		{ name: 'listingUrl', displayName: 'View Listing', displayType: 'link' },
+   		{ name: 'photoUrl', displayName: 'Photo', displayType: 'image' }
+   	]
+   };
    ```
 
-2. **Time-series data display**
+2. **Infrastructure monitoring**
 
-   ```svelte
-   <script lang="ts">
-   	// For time-series data, focus on more relevant information with filtering
-   	const popupOptions = {
-   		filterProperties: (name) =>
-   			['timestamp', 'observed_at', 'temperature', 'value'].includes(name)
-   	};
-   </script>
+   ```typescript
+   const popupOptions = {
+   	properties: [
+   		{ name: 'stationId', displayName: 'Station ID' },
+   		{ name: 'status', displayName: 'Status' },
+   		{ name: 'lastInspection', displayName: 'Last Inspection' },
+   		{ name: 'manualUrl', displayName: 'Manual', displayType: 'link' },
+   		{ name: 'supportEmail', displayName: 'Support', displayType: 'email' }
+   	]
+   };
    ```
 
 3. **Adding data attributions**
