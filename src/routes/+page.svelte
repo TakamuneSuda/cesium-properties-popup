@@ -21,7 +21,6 @@
 		name: string;
 		selected: boolean;
 		displayType?: import('$lib/types').PropertyDisplayType;
-		displayOptions?: import('$lib/types').PropertyDisplayOptions;
 	}
 
 	// Initialize properties for each dataset
@@ -33,8 +32,7 @@
 			code: 'P35_007',
 			name: 'Website URL',
 			selected: true,
-			displayType: 'link',
-			displayOptions: { linkTarget: '_blank' }
+			displayType: 'link'
 		}
 	];
 
@@ -58,8 +56,7 @@
 			code: 'HP',
 			name: 'Homepage',
 			selected: true,
-			displayType: 'link',
-			displayOptions: { linkTarget: '_blank' }
+			displayType: 'link'
 		},
 		{
 			code: 'Image',
@@ -115,8 +112,7 @@
 			return selectedProps.map((p) => ({
 				name: p.code,
 				displayName: p.name,
-				displayType: p.displayType,
-				displayOptions: p.displayOptions
+				displayType: p.displayType
 			}));
 		}
 		return [];
@@ -499,8 +495,7 @@
 						code: 'P35_007',
 						name: 'Website URL',
 						selected: true,
-						displayType: 'link',
-						displayOptions: { linkTarget: '_blank' }
+						displayType: 'link'
 					}
 				];
 				railwayProperties = [
@@ -521,8 +516,7 @@
 						code: 'HP',
 						name: 'Homepage',
 						selected: true,
-						displayType: 'link',
-						displayOptions: { linkTarget: '_blank' }
+						displayType: 'link'
 					},
 					{
 						code: 'Image',

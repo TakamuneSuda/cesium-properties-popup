@@ -13,14 +13,6 @@ export type PropertyDisplayType =
 	| 'email'; // メールアドレス
 
 /**
- * プロパティ表示のオプション
- */
-export interface PropertyDisplayOptions {
-	/** リンクのターゲット（_blank, _self など） */
-	linkTarget?: string;
-}
-
-/**
  * プロパティ設定の型定義
  */
 export interface PropertyConfig {
@@ -32,9 +24,6 @@ export interface PropertyConfig {
 
 	/** 表示タイプ */
 	displayType?: PropertyDisplayType;
-
-	/** 表示オプション */
-	displayOptions?: PropertyDisplayOptions;
 }
 
 /**

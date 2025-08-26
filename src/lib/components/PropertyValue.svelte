@@ -23,7 +23,6 @@
 
 	// 表示タイプの取得
 	const displayType = $derived(config?.displayType || 'text');
-	const displayOptions = $derived(config?.displayOptions || {});
 	const displayValue = $derived(getDefaultValue(value));
 </script>
 
@@ -32,7 +31,7 @@
 {:else if displayType === 'link'}
 	<a
 		href={displayValue}
-		target={displayOptions.linkTarget || '_blank'}
+		target="_blank"
 		rel="noopener noreferrer"
 		class="text-blue-600 underline hover:text-blue-800"
 		aria-label={`Open link: ${displayValue}`}
