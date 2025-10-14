@@ -19,6 +19,26 @@ export type PropertyDisplayType =
 export type DataSourcePattern = string | RegExp;
 
 /**
+ * エンティティイベントコールバックのコンテキスト情報
+ */
+export interface EntityEventContext {
+	/** イベントが発生したエンティティ */
+	entity: Cesium.Entity;
+
+	/** クリック/ホバー時のマウス位置（ピクセル座標） */
+	position: {
+		x: number;
+		y: number;
+	};
+
+	/** イベントタイプ */
+	eventType: 'click' | 'hover';
+
+	/** DataSource名（存在する場合） */
+	dataSourceName?: string;
+}
+
+/**
  * プロパティ設定の型定義
  */
 export interface PropertyConfig {
@@ -90,6 +110,35 @@ export interface EntityPopupOptions {
 		/** ポップアップの縦方向のオーバーフロー（CSS値） */
 		overflowY?: string;
 	};
+
+	/**
+	 * ポップアップを自動表示するかどうか (デフォルト: true)
+	 * false に設定すると、コールバックのみ実行されポップアップは表示されない
+	 */
+	showPopup?: boolean;
+
+	/**
+	 * エンティティがクリックされた時のコールバック
+	 * コールバックは常に実行され、showPopup オプションとは独立
+	 *
+	 * @param context - イベントコンテキスト情報
+	 */
+	onEntityClick?: (context: EntityEventContext) => void | Promise<void>;
+
+	/**
+	 * エンティティにホバーした時のコールバック
+	 * コールバックは常に実行され、showPopup オプションとは独立
+	 *
+	 * @param context - イベントコンテキスト情報
+	 */
+	onEntityHover?: (context: EntityEventContext) => void | Promise<void>;
+
+	/**
+	 * 空白（エンティティ以外）がクリックされた時のコールバック
+	 *
+	 * @param position - クリック位置
+	 */
+	onEmptyClick?: (position: { x: number; y: number }) => void | Promise<void>;
 }
 
 /**

@@ -13,6 +13,7 @@ demo site: [https://d2hgd9m8me42il.cloudfront.net/](https://d2hgd9m8me42il.cloud
 - [Basic Usage](#basic-usage)
 - [Supported Entity Types](#supported-entity-types)
 - [Layer Control](#layer-control)
+- [Event Callbacks](#event-callbacks)
 - [Property Selection and Display Types](#property-selection-and-display-types)
 - [Customization Options](#customization-options)
 - [Styling](#styling)
@@ -325,6 +326,239 @@ const popupOptions = {
 };
 ```
 
+## Event Callbacks
+
+You can use callback functions to execute custom logic when entities are clicked or hovered. The callbacks receive detailed context information including the entity, mouse position, and DataSource name.
+
+### Basic Callback Usage
+
+```svelte
+<script lang="ts">
+	import { EntityPopup } from 'cesium-properties-popup';
+	import type { EntityEventContext } from 'cesium-properties-popup';
+
+	const popupOptions = {
+		// Entity click callback
+		onEntityClick: (context: EntityEventContext) => {
+			console.log('Entity clicked:', context.entity);
+			console.log('DataSource:', context.dataSourceName);
+			console.log('Position:', context.position);
+		},
+
+		// Entity hover callback
+		onEntityHover: (context: EntityEventContext) => {
+			console.log('Entity hovered:', context.entity);
+		},
+
+		// Empty space click callback
+		onEmptyClick: (position: { x: number; y: number }) => {
+			console.log('Empty space clicked at:', position);
+		}
+	};
+</script>
+
+{#if viewerReady && viewer && cesium}
+	<EntityPopup {viewer} {cesium} options={popupOptions} />
+{/if}
+```
+
+### EntityEventContext Interface
+
+The callback functions receive a context object with the following properties:
+
+```typescript
+interface EntityEventContext {
+	/** The entity that was clicked or hovered */
+	entity: Cesium.Entity;
+
+	/** Mouse position in screen coordinates (pixels) */
+	position: {
+		x: number;
+		y: number;
+	};
+
+	/** Event type ('click' or 'hover') */
+	eventType: 'click' | 'hover';
+
+	/** Name of the DataSource that owns the entity (if available) */
+	dataSourceName?: string;
+}
+```
+
+### Controlling Popup Display
+
+You can control whether the popup is displayed independently of callbacks using the `showPopup` option:
+
+```typescript
+const popupOptions = {
+	// Disable automatic popup display
+	showPopup: false,
+
+	// Only use callbacks without showing popup
+	onEntityClick: (context: EntityEventContext) => {
+		// Custom logic, like opening a custom panel
+		showCustomPanel(context.entity);
+	}
+};
+```
+
+### Practical Examples
+
+#### 1. Analytics Tracking
+
+```typescript
+const popupOptions = {
+	onEntityClick: (context: EntityEventContext) => {
+		// Track entity clicks for analytics
+		trackEvent('entity_click', {
+			entityId: context.entity.id,
+			dataSource: context.dataSourceName,
+			timestamp: new Date().toISOString()
+		});
+	}
+};
+```
+
+#### 2. Custom Data Loading
+
+```typescript
+const popupOptions = {
+	onEntityClick: async (context: EntityEventContext) => {
+		// Load additional data when entity is clicked
+		const entityId = context.entity.id;
+		const additionalData = await fetchDetailedInfo(entityId);
+
+		// Update UI with loaded data
+		updateDetailPanel(additionalData);
+	}
+};
+```
+
+#### 3. Filtering by DataSource
+
+```typescript
+const popupOptions = {
+	onEntityClick: (context: EntityEventContext) => {
+		// Different behavior based on DataSource
+		if (context.dataSourceName === 'buildings') {
+			showBuildingDetails(context.entity);
+		} else if (context.dataSourceName === 'roads') {
+			showRoadInformation(context.entity);
+		}
+	}
+};
+```
+
+#### 4. Conditional Popup Display
+
+```typescript
+let showPopupForEntity = $state(true);
+
+const popupOptions = {
+	// Control popup visibility dynamically
+	showPopup: showPopupForEntity,
+
+	onEntityClick: (context: EntityEventContext) => {
+		// Decide whether to show popup based on entity properties
+		const priority = context.entity.properties?.priority?.getValue();
+		showPopupForEntity = priority === 'high';
+
+		// Always log the click regardless of popup visibility
+		console.log('Clicked entity with priority:', priority);
+	}
+};
+```
+
+#### 5. Integrating with External UI
+
+```typescript
+import { writable } from 'svelte/store';
+
+const selectedEntityStore = writable<Cesium.Entity | null>(null);
+
+const popupOptions = {
+	// Disable built-in popup
+	showPopup: false,
+
+	// Use custom UI instead
+	onEntityClick: (context: EntityEventContext) => {
+		// Update store to trigger custom UI component
+		selectedEntityStore.set(context.entity);
+	},
+
+	onEmptyClick: () => {
+		// Clear selection when clicking empty space
+		selectedEntityStore.set(null);
+	}
+};
+```
+
+#### 6. Error Handling in Async Callbacks
+
+```typescript
+const popupOptions = {
+	onEntityClick: async (context: EntityEventContext) => {
+		try {
+			// Async operation that might fail
+			const data = await fetchEntityData(context.entity.id);
+			processData(data);
+		} catch (error) {
+			// Error is automatically logged by the library
+			// You can add custom error handling here
+			showErrorNotification('Failed to load entity data');
+		}
+	}
+};
+```
+
+#### 7. Hover Preview with Click for Details
+
+```typescript
+let hoveredEntity = $state<Cesium.Entity | null>(null);
+let selectedEntity = $state<Cesium.Entity | null>(null);
+
+const popupOptions = {
+	// Show popup on hover
+	enableHover: true,
+
+	onEntityHover: (context: EntityEventContext) => {
+		// Show quick preview on hover
+		hoveredEntity = context.entity;
+		showQuickPreview(context.entity);
+	},
+
+	onEntityClick: (context: EntityEventContext) => {
+		// Show detailed view on click
+		selectedEntity = context.entity;
+		openDetailedView(context.entity);
+	}
+};
+```
+
+#### 8. Combining Callbacks with Layer Filtering
+
+```typescript
+const popupOptions = {
+	// Only show popups for specific layers
+	includeDataSources: ['interactive-layer', /^data-.*/],
+
+	// But track clicks on all entities
+	onEntityClick: (context: EntityEventContext) => {
+		// This callback fires even for excluded DataSources
+		// if the entity is clicked (popup just won't show)
+		logEntityInteraction(context);
+	}
+};
+```
+
+### Important Notes
+
+- Callbacks are executed **before** the popup is displayed
+- Callbacks work independently of the `showPopup` option
+- Both synchronous and asynchronous (Promise-based) callbacks are supported
+- Errors in callbacks are automatically caught and logged to console
+- Callbacks receive context even when popup display is disabled by layer filters
+
 ## Property Selection and Display Types
 
 ### Property Selection with Whitelist Mode
@@ -483,13 +717,17 @@ npm run build   # Rebuild the library
 
 ### Options API
 
-| Option               | Type                         | Default     | Description                                                          |
-| -------------------- | ---------------------------- | ----------- | -------------------------------------------------------------------- |
-| `enableHover`        | boolean                      | `true`      | Enable popup display on hover                                        |
-| `properties`         | PropertyConfig[] \| string[] | `undefined` | Whitelist of properties to display with optional configuration       |
-| `excludeDataSources` | DataSourcePattern[]          | `undefined` | DataSource patterns to exclude from popup display (string or RegExp) |
-| `includeDataSources` | DataSourcePattern[]          | `undefined` | DataSource patterns to include for popup display (whitelist)         |
-| `styleOptions`       | object                       | `{}`        | Style configuration for the popup                                    |
+| Option               | Type                                                          | Default     | Description                                                                        |
+| -------------------- | ------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------- |
+| `enableHover`        | boolean                                                       | `true`      | Enable popup display on hover                                                      |
+| `properties`         | PropertyConfig[] \| string[]                                  | `undefined` | Whitelist of properties to display with optional configuration                     |
+| `excludeDataSources` | DataSourcePattern[]                                           | `undefined` | DataSource patterns to exclude from popup display (string or RegExp)               |
+| `includeDataSources` | DataSourcePattern[]                                           | `undefined` | DataSource patterns to include for popup display (whitelist)                       |
+| `showPopup`          | boolean                                                       | `true`      | Whether to automatically show popup (can be controlled independently of callbacks) |
+| `onEntityClick`      | (context: EntityEventContext) => void \| Promise\<void\>      | `undefined` | Callback executed when an entity is clicked                                        |
+| `onEntityHover`      | (context: EntityEventContext) => void \| Promise\<void\>      | `undefined` | Callback executed when an entity is hovered                                        |
+| `onEmptyClick`       | (position: {x: number, y: number}) => void \| Promise\<void\> | `undefined` | Callback executed when empty space is clicked                                      |
+| `styleOptions`       | object                                                        | `{}`        | Style configuration for the popup                                                  |
 
 #### Style Options
 
@@ -562,6 +800,20 @@ export type PropertyDisplayType =
 export type DataSourcePattern = string | RegExp;
 
 /**
+ * Entity event context for callbacks
+ */
+export interface EntityEventContext {
+	/** The entity that triggered the event */
+	entity: Cesium.Entity;
+	/** Mouse position in screen coordinates */
+	position: { x: number; y: number };
+	/** Event type */
+	eventType: 'click' | 'hover';
+	/** DataSource name (if available) */
+	dataSourceName?: string;
+}
+
+/**
  * Property configuration
  */
 export interface PropertyConfig {
@@ -585,6 +837,14 @@ export interface EntityPopupOptions {
 	excludeDataSources?: DataSourcePattern[];
 	/** DataSource patterns to include for popup display (whitelist) */
 	includeDataSources?: DataSourcePattern[];
+	/** Whether to automatically show popup (default: true) */
+	showPopup?: boolean;
+	/** Callback when entity is clicked */
+	onEntityClick?: (context: EntityEventContext) => void | Promise<void>;
+	/** Callback when entity is hovered */
+	onEntityHover?: (context: EntityEventContext) => void | Promise<void>;
+	/** Callback when empty space is clicked */
+	onEmptyClick?: (position: { x: number; y: number }) => void | Promise<void>;
 	/** Popup CSS settings */
 	styleOptions?: {
 		/** Popup width in pixels */

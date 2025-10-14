@@ -1,8 +1,29 @@
 <script lang="ts">
 	import Map from './cesium/Map.svelte';
-	import type { EntityPopupOptions } from '$lib/types';
+	import type { EntityPopupOptions, EntityEventContext } from '$lib/types';
 	import { writable } from 'svelte/store';
+	import { untrack } from 'svelte';
 	import './themes.css';
+
+	// Callback event tracking
+	interface CallbackEvent {
+		id: string;
+		timestamp: string;
+		type: 'click' | 'hover' | 'empty';
+		entityId?: string;
+		dataSourceName?: string;
+		position: { x: number; y: number };
+	}
+
+	let callbackEvents = $state<CallbackEvent[]>([]);
+	let callbacksEnabled = $state(true);
+	const maxEvents = 10; // Keep only last 10 events
+	let eventIdCounter = 0;
+
+	function addCallbackEvent(event: Omit<CallbackEvent, 'id'>) {
+		const eventWithId = { ...event, id: `event-${++eventIdCounter}` };
+		callbackEvents = [eventWithId, ...callbackEvents].slice(0, maxEvents);
+	}
 
 	// Theme presets
 	const themes = [
@@ -92,7 +113,9 @@
 	];
 
 	// Calculate excluded DataSources based on disabled layers
-	$: excludedDataSources = layers.filter((layer) => !layer.enabled).map((layer) => layer.name);
+	let excludedDataSources = $derived(
+		layers.filter((layer) => !layer.enabled).map((layer) => layer.name)
+	);
 
 	// Helper function to test regex pattern
 	function testRegexPattern(pattern: string, name: string): boolean {
@@ -127,7 +150,8 @@
 
 	// Update popup options from regex patterns
 	function updatePopupOptionsFromRegex() {
-		const newOptions = { ...$popupOptions };
+		// Use untrack to prevent reading $popupOptions from creating a reactive dependency
+		const newOptions = { ...untrack(() => $popupOptions) };
 
 		if (filterMode === 'regex') {
 			if (regexPatterns.length > 0) {
@@ -158,11 +182,53 @@
 		console.log('🔧 Updated popup options:', newOptions);
 	}
 
+	// Callback functions
+	function handleEntityClick(context: EntityEventContext) {
+		if (!callbacksEnabled) return;
+
+		addCallbackEvent({
+			timestamp: new Date().toLocaleTimeString(),
+			type: 'click',
+			entityId: context.entity.id,
+			dataSourceName: context.dataSourceName,
+			position: context.position
+		});
+
+		console.log('Entity clicked:', context);
+	}
+
+	function handleEntityHover(context: EntityEventContext) {
+		if (!callbacksEnabled) return;
+
+		addCallbackEvent({
+			timestamp: new Date().toLocaleTimeString(),
+			type: 'hover',
+			entityId: context.entity.id,
+			dataSourceName: context.dataSourceName,
+			position: context.position
+		});
+	}
+
+	function handleEmptyClick(position: { x: number; y: number }) {
+		if (!callbacksEnabled) return;
+
+		addCallbackEvent({
+			timestamp: new Date().toLocaleTimeString(),
+			type: 'empty',
+			position: position
+		});
+
+		console.log('Empty space clicked at:', position);
+	}
+
 	// Manage popup options with store
 	const popupOptions = writable<EntityPopupOptions>({
 		enableHover: true,
 		properties: undefined,
 		excludeDataSources: excludedDataSources,
+		onEntityClick: handleEntityClick,
+		onEntityHover: handleEntityHover,
+		onEmptyClick: handleEmptyClick,
 		styleOptions: {
 			width: 300,
 			height: 300,
@@ -172,31 +238,25 @@
 	});
 
 	// Initialize properties on mount
-	$: if (propertyMode === 'whitelist-with-names') {
-		updatePropertyMode(propertyMode);
-	}
+	$effect(() => {
+		if (propertyMode === 'whitelist-with-names') {
+			updatePropertyMode(propertyMode);
+		}
+	});
 
-	// Reactive: Watch filter mode, regex mode, and regex patterns changes
-	$: if (filterMode || regexMode || regexPatterns) {
-		// Update when filterMode, regexMode, or regexPatterns change
+	// Reactive: Watch filter mode, regex mode, regex patterns, and layers changes
+	$effect(() => {
+		// Update when filterMode, regexMode, regexPatterns, or excludedDataSources change
 		updatePopupOptionsFromRegex();
-	}
-
-	// Update popup options when layer settings change (only for individual mode)
-	$: if (filterMode === 'individual' && excludedDataSources) {
-		const newOptions = {
-			...$popupOptions,
-			excludeDataSources: excludedDataSources
-		};
-		popupOptions.set(newOptions);
-	}
+	});
 
 	// Style options update handler
 	function updateStyleOption(option: string, value: string | number) {
+		const currentOptions = untrack(() => $popupOptions);
 		const newOptions = {
-			...$popupOptions,
+			...currentOptions,
 			styleOptions: {
-				...$popupOptions.styleOptions,
+				...currentOptions.styleOptions,
 				[option]: value
 			}
 		};
@@ -228,7 +288,7 @@
 	// Update property mode
 	function updatePropertyMode(mode: PropertyMode) {
 		propertyMode = mode;
-		const newOptions = { ...$popupOptions };
+		const newOptions = { ...untrack(() => $popupOptions) };
 
 		switch (mode) {
 			case 'all':
@@ -321,7 +381,10 @@
 						type="checkbox"
 						checked={$popupOptions.enableHover}
 						onchange={(e) => {
-							const newOptions = { ...$popupOptions, enableHover: e.currentTarget.checked };
+							const newOptions = {
+								...untrack(() => $popupOptions),
+								enableHover: e.currentTarget.checked
+							};
 							popupOptions.set(newOptions);
 						}}
 						class="mr-2"
@@ -796,11 +859,78 @@
 			</div>
 		</div>
 
+		<!-- Callback Events Section -->
+		<div class="mb-6">
+			<h3 class="mb-2 text-lg font-semibold">Event Callbacks</h3>
+			<div class="mb-3">
+				<label class="flex items-center">
+					<input type="checkbox" bind:checked={callbacksEnabled} class="mr-2" />
+					Enable callback logging
+				</label>
+			</div>
+
+			{#if callbacksEnabled}
+				<div class="mb-2 flex justify-between">
+					<span class="text-sm font-medium">Recent Events ({callbackEvents.length})</span>
+					<button
+						onclick={() => (callbackEvents = [])}
+						class="text-xs text-blue-600 hover:underline"
+					>
+						Clear
+					</button>
+				</div>
+
+				<div class="max-h-60 space-y-2 overflow-y-auto rounded border bg-gray-50 p-2">
+					{#if callbackEvents.length === 0}
+						<p class="text-center text-sm text-gray-500">
+							Click or hover over entities to see callback events
+						</p>
+					{:else}
+						{#each callbackEvents as event (event.id)}
+							<div
+								class="rounded border bg-white p-2 text-xs {event.type === 'click'
+									? 'border-l-4 border-l-blue-500'
+									: event.type === 'hover'
+										? 'border-l-4 border-l-green-500'
+										: 'border-l-4 border-l-gray-400'}"
+							>
+								<div class="mb-1 flex items-center justify-between">
+									<span class="font-semibold text-gray-700 uppercase">{event.type}</span>
+									<span class="text-gray-500">{event.timestamp}</span>
+								</div>
+								{#if event.entityId}
+									<div class="text-gray-600">
+										<div>ID: {event.entityId}</div>
+										{#if event.dataSourceName}
+											<div>Layer: {event.dataSourceName}</div>
+										{/if}
+										<div>
+											Position: ({Math.round(event.position.x)}, {Math.round(event.position.y)})
+										</div>
+									</div>
+								{:else}
+									<div class="text-gray-600">
+										Empty space at ({Math.round(event.position.x)}, {Math.round(event.position.y)})
+									</div>
+								{/if}
+							</div>
+						{/each}
+					{/if}
+				</div>
+
+				<div class="mt-2 rounded bg-blue-50 p-2 text-xs text-gray-700">
+					<strong>Note:</strong> Callbacks work independently of popup display. Check the browser console
+					for detailed logs.
+				</div>
+			{/if}
+		</div>
+
 		<!-- Reset button -->
 		<button
 			class="w-full rounded bg-gray-200 px-4 py-2 font-semibold text-gray-800 hover:bg-gray-300"
 			onclick={() => {
 				propertyMode = 'all';
+				callbackEvents = [];
 				roadStationProperties = [
 					{ code: 'P35_006', name: 'Road Station Name', selected: true },
 					{ code: 'P35_003', name: 'Prefecture', selected: true },
@@ -850,6 +980,9 @@
 					enableHover: true,
 					properties: undefined,
 					excludeDataSources: [],
+					onEntityClick: handleEntityClick,
+					onEntityHover: handleEntityHover,
+					onEmptyClick: handleEmptyClick,
 					styleOptions: {
 						width: 300,
 						height: 300,

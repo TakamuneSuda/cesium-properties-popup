@@ -2,7 +2,7 @@
 	import type * as CesiumType from 'cesium';
 	import PopupPositioner from './PopupPositioner.svelte';
 	import PopupContent from './PopupContent.svelte';
-	import type { EntityPopupProps, DataSourcePattern } from '../types';
+	import type { EntityPopupProps, DataSourcePattern, EntityEventContext } from '../types';
 
 	let { viewer, cesium, options = {} }: EntityPopupProps = $props();
 
@@ -31,6 +31,48 @@
 			}
 			return false;
 		});
+	}
+
+	/**
+	 * コールバックを安全に実行する
+	 * @param callback - 実行するコールバック関数
+	 * @param entity - イベントが発生したエンティティ
+	 * @param position - マウス位置
+	 * @param eventType - イベントタイプ
+	 */
+	async function executeCallback(
+		callback: ((context: EntityEventContext) => void | Promise<void>) | undefined,
+		entity: CesiumType.Entity,
+		position: { x: number; y: number },
+		eventType: 'click' | 'hover'
+	): Promise<void> {
+		if (!callback) {
+			return;
+		}
+
+		try {
+			// DataSource名を取得
+			let dataSourceName: string | undefined;
+			if (entity.entityCollection && entity.entityCollection.owner) {
+				const owner = entity.entityCollection.owner;
+				if ('name' in owner) {
+					dataSourceName = (owner as CesiumType.DataSource).name;
+				}
+			}
+
+			// コンテキストを構築
+			const context: EntityEventContext = {
+				entity,
+				position,
+				eventType,
+				dataSourceName
+			};
+
+			// コールバックを実行
+			await callback(context);
+		} catch (error) {
+			console.error(`Error in ${eventType} callback:`, error);
+		}
 	}
 
 	/**
@@ -88,19 +130,41 @@
 
 			// Monitor left click events
 			currentEventHandler.setInputAction(
-				(click: CesiumType.ScreenSpaceEventHandler.PositionedEvent) => {
+				async (click: CesiumType.ScreenSpaceEventHandler.PositionedEvent) => {
 					const pickedObject = viewer.scene.pick(click.position);
 
 					if (cesium.defined(pickedObject) && pickedObject.id instanceof cesium.Entity) {
+						const entity = pickedObject.id;
+
 						// ポップアップ表示可否をチェック
-						if (shouldShowPopupForEntity(pickedObject.id)) {
-							selectedEntity = pickedObject.id;
-							displayMode = 'click';
-							isPopupOpen = true;
+						if (shouldShowPopupForEntity(entity)) {
+							// クリックコールバックを実行
+							await executeCallback(options.onEntityClick, entity, click.position, 'click');
+
+							// showPopup オプション（デフォルト: true）に従ってポップアップを表示
+							const shouldShowPopup = options.showPopup ?? true;
+							if (shouldShowPopup) {
+								selectedEntity = entity;
+								displayMode = 'click';
+								isPopupOpen = true;
+							}
 						}
 					} else {
+						// 空白クリック
 						displayMode = 'hover';
 						closePopup();
+
+						// 空白クリックコールバックを実行
+						if (options.onEmptyClick) {
+							try {
+								await options.onEmptyClick({
+									x: click.position.x,
+									y: click.position.y
+								});
+							} catch (error) {
+								console.error('Error in onEmptyClick callback:', error);
+							}
+						}
 					}
 				},
 				cesium.ScreenSpaceEventType.LEFT_CLICK
@@ -109,7 +173,7 @@
 			// Add hover events (only if enableHover is true)
 			if (enableHoverEffect) {
 				currentEventHandler.setInputAction(
-					(movement: CesiumType.ScreenSpaceEventHandler.MotionEvent) => {
+					async (movement: CesiumType.ScreenSpaceEventHandler.MotionEvent) => {
 						if (isProcessingClick || displayMode === 'click') {
 							return;
 						}
@@ -119,8 +183,20 @@
 						if (cesium.defined(pickedObject) && pickedObject.id instanceof cesium.Entity) {
 							// ポップアップ表示可否をチェック
 							if (shouldShowPopupForEntity(pickedObject.id)) {
-								selectedEntity = pickedObject.id;
-								isPopupOpen = true;
+								// ホバーコールバックを実行
+								await executeCallback(
+									options.onEntityHover,
+									pickedObject.id,
+									movement.endPosition,
+									'hover'
+								);
+
+								// showPopup オプション（デフォルト: true）に従ってポップアップを表示
+								const shouldShowPopup = options.showPopup ?? true;
+								if (shouldShowPopup) {
+									selectedEntity = pickedObject.id;
+									isPopupOpen = true;
+								}
 							}
 						} else if (!cesium.defined(pickedObject)) {
 							closePopup();
