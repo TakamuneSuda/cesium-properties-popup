@@ -15,6 +15,16 @@
 	type PropertyMode = 'all' | 'whitelist' | 'whitelist-with-names';
 	let propertyMode: PropertyMode = 'whitelist-with-names';
 
+	// Layer filter mode
+	type FilterMode = 'individual' | 'regex';
+	let filterMode: FilterMode = 'individual';
+
+	// Regex filter settings
+	type RegexMode = 'include' | 'exclude';
+	let regexMode: RegexMode = 'exclude';
+	let regexPatternInput: string = '';
+	let regexPatterns: string[] = [];
+
 	// Property configurations
 	interface PropertyItem {
 		code: string;
@@ -67,10 +77,92 @@
 		{ code: 'Email', name: 'Email Address', selected: true, displayType: 'email' }
 	];
 
+	// Layer control settings
+	interface LayerItem {
+		name: string;
+		displayName: string;
+		enabled: boolean;
+	}
+
+	let layers: LayerItem[] = [
+		{ name: 'road-stations', displayName: 'Road Stations', enabled: true },
+		{ name: 'railways', displayName: 'Railways', enabled: true },
+		{ name: 'lakes', displayName: 'Lakes', enabled: true },
+		{ name: 'contents', displayName: 'Contents', enabled: true }
+	];
+
+	// Calculate excluded DataSources based on disabled layers
+	$: excludedDataSources = layers.filter((layer) => !layer.enabled).map((layer) => layer.name);
+
+	// Helper function to test regex pattern
+	function testRegexPattern(pattern: string, name: string): boolean {
+		try {
+			const regex = new RegExp(pattern);
+			return regex.test(name);
+		} catch {
+			return false;
+		}
+	}
+
+	// Add regex pattern
+	function addRegexPattern() {
+		if (regexPatternInput.trim()) {
+			// Validate regex pattern
+			try {
+				new RegExp(regexPatternInput);
+				regexPatterns = [...regexPatterns, regexPatternInput];
+				regexPatternInput = '';
+				updatePopupOptionsFromRegex();
+			} catch (e) {
+				alert('Invalid regex pattern: ' + (e as Error).message);
+			}
+		}
+	}
+
+	// Remove regex pattern
+	function removeRegexPattern(index: number) {
+		regexPatterns = regexPatterns.filter((_, i) => i !== index);
+		updatePopupOptionsFromRegex();
+	}
+
+	// Update popup options from regex patterns
+	function updatePopupOptionsFromRegex() {
+		const newOptions = { ...$popupOptions };
+
+		if (filterMode === 'regex') {
+			if (regexPatterns.length > 0) {
+				const patterns = regexPatterns.map((p) => new RegExp(p));
+
+				if (regexMode === 'exclude') {
+					newOptions.excludeDataSources = patterns;
+					newOptions.includeDataSources = undefined;
+					console.log('🔴 Regex Exclude Mode:', patterns);
+				} else {
+					newOptions.includeDataSources = patterns;
+					newOptions.excludeDataSources = undefined;
+					console.log('✅ Regex Include Mode:', patterns);
+				}
+			} else {
+				// No patterns: clear filters
+				newOptions.excludeDataSources = undefined;
+				newOptions.includeDataSources = undefined;
+				console.log('⚪ No regex patterns - showing all layers');
+			}
+		} else if (filterMode === 'individual') {
+			newOptions.excludeDataSources = excludedDataSources;
+			newOptions.includeDataSources = undefined;
+			console.log('📋 Individual Mode - Excluded:', excludedDataSources);
+		}
+
+		popupOptions.set(newOptions);
+		console.log('🔧 Updated popup options:', newOptions);
+	}
+
 	// Manage popup options with store
 	const popupOptions = writable<EntityPopupOptions>({
 		enableHover: true,
 		properties: undefined,
+		excludeDataSources: excludedDataSources,
 		styleOptions: {
 			width: 300,
 			height: 300,
@@ -82,6 +174,21 @@
 	// Initialize properties on mount
 	$: if (propertyMode === 'whitelist-with-names') {
 		updatePropertyMode(propertyMode);
+	}
+
+	// Reactive: Watch filter mode, regex mode, and regex patterns changes
+	$: if (filterMode || regexMode || regexPatterns) {
+		// Update when filterMode, regexMode, or regexPatterns change
+		updatePopupOptionsFromRegex();
+	}
+
+	// Update popup options when layer settings change (only for individual mode)
+	$: if (filterMode === 'individual' && excludedDataSources) {
+		const newOptions = {
+			...$popupOptions,
+			excludeDataSources: excludedDataSources
+		};
+		popupOptions.set(newOptions);
 	}
 
 	// Style options update handler
@@ -222,6 +329,213 @@
 					Show popup on hover
 				</label>
 			</div>
+		</div>
+
+		<!-- Layer control settings -->
+		<div class="mb-6">
+			<h3 class="mb-2 text-lg font-semibold">Layer Control</h3>
+
+			<!-- Filter Mode Selector -->
+			<div class="mb-3">
+				<label for="filter-mode" class="mb-1 block text-sm font-medium">Filter Mode</label>
+				<select
+					id="filter-mode"
+					class="w-full rounded border p-2"
+					bind:value={filterMode}
+					onchange={() => updatePopupOptionsFromRegex()}
+				>
+					<option value="individual">Individual Selection (Checkbox)</option>
+					<option value="regex">Regex Pattern (String or RegExp)</option>
+				</select>
+			</div>
+
+			{#if filterMode === 'individual'}
+				<!-- Individual checkbox mode -->
+				<div class="mb-3 rounded bg-yellow-50 p-3 text-sm">
+					<p class="text-xs">Uncheck to disable popups for that layer</p>
+				</div>
+				<div class="space-y-2">
+					{#each layers as layer (layer.name)}
+						<label class="flex items-center rounded border p-2 hover:bg-gray-50">
+							<input type="checkbox" bind:checked={layer.enabled} class="mr-3" />
+							<span class="flex-1">
+								{layer.displayName}
+							</span>
+							<span class="ml-2 rounded bg-gray-200 px-2 py-1 text-xs text-gray-600">
+								{layer.name}
+							</span>
+						</label>
+					{/each}
+				</div>
+				<div class="mt-3 rounded bg-blue-50 p-2 text-xs text-blue-700">
+					Excluded layers: {excludedDataSources.length === 0
+						? 'None'
+						: excludedDataSources.join(', ')}
+				</div>
+			{:else if filterMode === 'regex'}
+				<!-- Regex pattern mode -->
+				<div class="mb-3 rounded bg-yellow-50 p-3 text-sm">
+					<p class="text-xs font-medium">RegExp Pattern Mode</p>
+					<p class="mt-1 text-xs">Enter JavaScript regex patterns to filter layers</p>
+				</div>
+
+				<!-- Regex mode selector (include/exclude) -->
+				<div class="mb-3">
+					<label class="mb-1 block text-sm font-medium">Pattern Type</label>
+					<div class="flex gap-3">
+						<label class="flex items-center">
+							<input
+								type="radio"
+								bind:group={regexMode}
+								value="exclude"
+								onchange={() => updatePopupOptionsFromRegex()}
+								class="mr-1"
+							/>
+							<span class="text-sm">Exclude (Blacklist)</span>
+						</label>
+						<label class="flex items-center">
+							<input
+								type="radio"
+								bind:group={regexMode}
+								value="include"
+								onchange={() => updatePopupOptionsFromRegex()}
+								class="mr-1"
+							/>
+							<span class="text-sm">Include (Whitelist)</span>
+						</label>
+					</div>
+				</div>
+
+				<!-- Pattern input -->
+				<div class="mb-3">
+					<label for="regex-pattern" class="mb-1 block text-sm font-medium"> RegExp Pattern </label>
+					<div class="flex gap-2">
+						<input
+							id="regex-pattern"
+							type="text"
+							bind:value={regexPatternInput}
+							placeholder="e.g., ^road-.* or lakes|contents"
+							class="flex-1 rounded border p-2 font-mono text-sm"
+							onkeydown={(e) => {
+								if (e.key === 'Enter') {
+									addRegexPattern();
+								}
+							}}
+						/>
+						<button
+							class="rounded bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
+							onclick={() => addRegexPattern()}
+						>
+							Add
+						</button>
+					</div>
+					<p class="mt-1 text-xs text-gray-500">Press Enter or click Add to add the pattern</p>
+				</div>
+
+				<!-- Pattern presets -->
+				<div class="mb-3">
+					<p class="mb-1 text-sm font-medium">Pattern Examples:</p>
+					<div class="grid grid-cols-2 gap-2">
+						<button
+							class="rounded border bg-white p-2 text-left text-xs hover:bg-gray-50"
+							onclick={() => (regexPatternInput = '^road-.*')}
+						>
+							<code>^road-.*</code>
+							<br />
+							<span class="text-gray-500">Starts with "road-"</span>
+						</button>
+						<button
+							class="rounded border bg-white p-2 text-left text-xs hover:bg-gray-50"
+							onclick={() => (regexPatternInput = '.*-stations$')}
+						>
+							<code>.*-stations$</code>
+							<br />
+							<span class="text-gray-500">Ends with "-stations"</span>
+						</button>
+						<button
+							class="rounded border bg-white p-2 text-left text-xs hover:bg-gray-50"
+							onclick={() => (regexPatternInput = 'road|rail')}
+						>
+							<code>road|rail</code>
+							<br />
+							<span class="text-gray-500">Contains "road" OR "rail"</span>
+						</button>
+						<button
+							class="rounded border bg-white p-2 text-left text-xs hover:bg-gray-50"
+							onclick={() => (regexPatternInput = '^(?!lakes).*')}
+						>
+							<code>^(?!lakes).*</code>
+							<br />
+							<span class="text-gray-500">NOT "lakes"</span>
+						</button>
+					</div>
+				</div>
+
+				<!-- Active patterns list -->
+				{#if regexPatterns.length > 0}
+					<div class="mb-3">
+						<p class="mb-1 text-sm font-medium">Active Patterns:</p>
+						<div class="space-y-1">
+							{#each regexPatterns as pattern, i (i)}
+								<div class="flex items-center justify-between rounded bg-gray-100 p-2">
+									<code class="text-xs">{pattern}</code>
+									<button
+										class="ml-2 text-red-500 hover:text-red-700"
+										onclick={() => removeRegexPattern(i)}
+										title="Remove pattern"
+									>
+										✕
+									</button>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Live preview -->
+				<div class="mb-3 rounded border bg-blue-50 p-3">
+					<p class="mb-2 text-sm font-medium">Live Preview:</p>
+					{#if regexPatternInput}
+						<div class="space-y-1 text-xs">
+							{#each layers as layer (layer.name)}
+								{@const matches = testRegexPattern(regexPatternInput, layer.name)}
+								<div class="flex items-center gap-2">
+									<span class={matches ? 'text-green-600' : 'text-gray-400'}>
+										{matches ? '✓' : '✗'}
+									</span>
+									<span class={matches ? 'font-medium' : ''}>
+										{layer.displayName} (<code>{layer.name}</code>)
+									</span>
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<p class="text-xs text-gray-500">Enter a pattern to see matches</p>
+					{/if}
+				</div>
+
+				<!-- Layer reference -->
+				<div class="rounded bg-gray-50 p-2 text-xs">
+					<p class="mb-1 font-medium">Available Layers:</p>
+					<ul class="space-y-0.5">
+						{#each layers as layer (layer.name)}
+							<li>
+								<code class="rounded bg-white px-1 py-0.5">{layer.name}</code>
+								- {layer.displayName}
+							</li>
+						{/each}
+					</ul>
+				</div>
+
+				<!-- Current filter status -->
+				<div class="mt-3 rounded bg-blue-50 p-2 text-xs text-blue-700">
+					<p class="font-medium">Current Filter:</p>
+					<p class="mt-1">
+						Mode: {regexMode === 'exclude' ? 'Exclude (Blacklist)' : 'Include (Whitelist)'}
+					</p>
+					<p>Patterns: {regexPatterns.length === 0 ? 'None' : regexPatterns.join(', ')}</p>
+				</div>
+			{/if}
 		</div>
 
 		<!-- Property selection -->
@@ -526,9 +840,16 @@
 					},
 					{ code: 'Email', name: 'Email Address', selected: true, displayType: 'email' }
 				];
+				layers = [
+					{ name: 'road-stations', displayName: 'Road Stations', enabled: true },
+					{ name: 'railways', displayName: 'Railways', enabled: true },
+					{ name: 'lakes', displayName: 'Lakes', enabled: true },
+					{ name: 'contents', displayName: 'Contents', enabled: true }
+				];
 				popupOptions.set({
 					enableHover: true,
 					properties: undefined,
+					excludeDataSources: [],
 					styleOptions: {
 						width: 300,
 						height: 300,

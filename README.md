@@ -12,6 +12,7 @@ demo site: [https://d2hgd9m8me42il.cloudfront.net/](https://d2hgd9m8me42il.cloud
 - [Installation](#installation)
 - [Basic Usage](#basic-usage)
 - [Supported Entity Types](#supported-entity-types)
+- [Layer Control](#layer-control)
 - [Property Selection and Display Types](#property-selection-and-display-types)
 - [Customization Options](#customization-options)
 - [Styling](#styling)
@@ -105,6 +106,225 @@ This library supports various Cesium entity types:
 - ✅ **Lines (Polylines)**
 - ✅ **Polygons**
 
+## Layer Control
+
+### DataSource-based Popup Control
+
+You can control popup display on a per-DataSource (layer) basis. This allows you to show popups only for specific layers or exclude certain layers.
+
+#### Show Only Specific Layers (Whitelist)
+
+```javascript
+const popup = new EntityPopup({
+	target: document.body,
+	props: {
+		viewer,
+		cesium,
+		options: {
+			// Show popups only for specified DataSource entities
+			includeDataSources: ['road-stations', 'railways', 'contents']
+		}
+	}
+});
+```
+
+#### Exclude Specific Layers (Blacklist)
+
+```javascript
+const popup = new EntityPopup({
+	target: document.body,
+	props: {
+		viewer,
+		cesium,
+		options: {
+			// Hide popups for specified DataSource entities
+			excludeDataSources: ['lakes', 'background']
+		}
+	}
+});
+```
+
+### Practical Example: Organizing Layers
+
+```javascript
+// Create DataSources with names matching demo layers
+const roadStationsDataSource = new Cesium.CustomDataSource('road-stations');
+const railwaysDataSource = new Cesium.CustomDataSource('railways');
+const lakesDataSource = new Cesium.CustomDataSource('lakes');
+const contentsDataSource = new Cesium.CustomDataSource('contents');
+
+viewer.dataSources.add(roadStationsDataSource);
+viewer.dataSources.add(railwaysDataSource);
+viewer.dataSources.add(lakesDataSource);
+viewer.dataSources.add(contentsDataSource);
+
+// Add road station entities (points)
+roadStationsDataSource.entities.add({
+	position: Cesium.Cartesian3.fromDegrees(139.7, 35.6),
+	point: {
+		pixelSize: 10,
+		color: Cesium.Color.RED,
+		heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+	},
+	properties: {
+		P35_006: 'Tokyo Station',
+		P35_003: 'Tokyo',
+		P35_004: 'Chiyoda'
+	}
+});
+
+// Add railway entities (polylines)
+railwaysDataSource.entities.add({
+	polyline: {
+		positions: Cesium.Cartesian3.fromDegreesArray([139.7, 35.6, 139.8, 35.7]),
+		width: 3,
+		material: Cesium.Color.YELLOW,
+		clampToGround: true
+	},
+	properties: {
+		N02_003: 'Yamanote Line',
+		N02_004: 'JR East'
+	}
+});
+
+// Configure popup to exclude lakes layer
+const popupOptions = {
+	excludeDataSources: ['lakes']
+};
+```
+
+### Dynamic Layer Control
+
+```javascript
+// Initialize with all layers enabled
+let popupOptions = {
+	excludeDataSources: []
+};
+
+// Function to toggle layer popup display
+function toggleLayerPopup(dataSourceName, enabled) {
+	if (enabled) {
+		// Remove from exclusion list (enable popups)
+		const index = popupOptions.excludeDataSources.indexOf(dataSourceName);
+		if (index > -1) {
+			popupOptions.excludeDataSources.splice(index, 1);
+		}
+	} else {
+		// Add to exclusion list (disable popups)
+		if (!popupOptions.excludeDataSources.includes(dataSourceName)) {
+			popupOptions.excludeDataSources.push(dataSourceName);
+		}
+	}
+
+	// Update popup options
+	popup.$set({ options: popupOptions });
+}
+
+// Example usage with UI checkboxes
+toggleLayerPopup('road-stations', false); // Disable road stations popups
+toggleLayerPopup('railways', true); // Enable railways popups
+toggleLayerPopup('lakes', false); // Disable lakes popups
+toggleLayerPopup('contents', true); // Enable contents popups
+```
+
+### Priority Rules
+
+When using both settings:
+
+1. **`includeDataSources`** (whitelist) - If specified, only DataSources included will show popups
+2. **`excludeDataSources`** (blacklist) - Applied when includeDataSources is not specified
+
+### Important Notes
+
+- DataSource `name` property is used for identification, so always set names when creating DataSources
+- Entities not belonging to any DataSource (directly under `viewer.entities`) will show popups by default
+- DataSources without names cannot be controlled
+
+### Using Regular Expression Patterns
+
+You can use regular expressions for flexible DataSource filtering:
+
+#### RegExp Pattern Examples
+
+```javascript
+const popup = new EntityPopup({
+	target: document.body,
+	props: {
+		viewer,
+		cesium,
+		options: {
+			// Mix of exact match and regex patterns
+			includeDataSources: [
+				'exact-layer-name', // Exact match
+				/^road-.*/, // Starts with "road-"
+				/.*-stations$/, // Ends with "-stations"
+				/railway|railroad/ // Contains "railway" OR "railroad"
+			]
+		}
+	}
+});
+```
+
+#### Practical Regex Examples
+
+```javascript
+// Show popups only for layers starting with "data-"
+const popupOptions = {
+	includeDataSources: [/^data-/]
+};
+
+// Exclude all temporary or test layers
+const popupOptions = {
+	excludeDataSources: [
+		/^temp-/, // Starts with "temp-"
+		/^test-/, // Starts with "test-"
+		/-draft$/ // Ends with "-draft"
+	]
+};
+
+// Complex pattern: show only specific prefixes
+const popupOptions = {
+	includeDataSources: [
+		/^(road|rail|building)-/ // Starts with "road-", "rail-", or "building-"
+	]
+};
+```
+
+#### Pattern Matching Rules
+
+1. **String patterns** perform exact matching
+
+   ```javascript
+   'layer-name'; // Matches only "layer-name" exactly
+   ```
+
+2. **RegExp patterns** use JavaScript regular expressions
+
+   ```javascript
+   /^prefix-/    // Matches any name starting with "prefix-"
+   /.*-suffix$/  // Matches any name ending with "-suffix"
+   /pattern/i    // Case-insensitive matching
+   ```
+
+3. **Mixed patterns** can be used together
+   ```javascript
+   includeDataSources: ['exact-name', /^pattern-.*$/, /.*-other$/];
+   ```
+
+#### TypeScript Usage with Patterns
+
+```typescript
+import { EntityPopup } from 'cesium-properties-popup';
+import type { DataSourcePattern } from 'cesium-properties-popup';
+
+// Type-safe pattern definition
+const includePatterns: DataSourcePattern[] = ['exact-layer', /^prefix-.*/, /.*-suffix$/];
+
+const popupOptions = {
+	includeDataSources: includePatterns
+};
+```
+
 ## Property Selection and Display Types
 
 ### Property Selection with Whitelist Mode
@@ -123,21 +343,21 @@ You can control which properties are displayed in the popup and in what order by
 	const advancedWhitelist: PropertyConfig[] = [
 		// Simple text property with custom display name
 		{ name: 'name', displayName: 'Name' },
-		
+
 		// Hyperlink display
 		{
 			name: 'website',
 			displayName: 'Website',
 			displayType: 'link'
 		},
-		
+
 		// Image display
 		{
 			name: 'imageUrl',
 			displayName: 'Preview',
 			displayType: 'image'
 		},
-		
+
 		// Email link
 		{
 			name: 'contact',
@@ -160,12 +380,12 @@ You can control which properties are displayed in the popup and in what order by
 
 The library supports several display types for properties:
 
-| Display Type | Description | Example |
-|--------------|-------------|---------|
-| `text` | Default text display | Plain property value |
-| `link` | Clickable hyperlink | Opens in new tab/window |
-| `image` | Image display | Shows image with 100% width |
-| `email` | Email link | Creates mailto: link |
+| Display Type | Description          | Example                     |
+| ------------ | -------------------- | --------------------------- |
+| `text`       | Default text display | Plain property value        |
+| `link`       | Clickable hyperlink  | Opens in new tab/window     |
+| `image`      | Image display        | Shows image with 100% width |
+| `email`      | Email link           | Creates mailto: link        |
 
 ### Example with Mixed Display Types
 
@@ -173,21 +393,21 @@ The library supports several display types for properties:
 const propertyConfig: PropertyConfig[] = [
 	// Regular text property
 	{ name: 'stationName', displayName: 'Station' },
-	
+
 	// Hyperlink that opens in new tab
 	{
 		name: 'homepageUrl',
 		displayName: 'Homepage',
 		displayType: 'link'
 	},
-	
+
 	// Image that displays at full width
 	{
 		name: 'photoUrl',
 		displayName: 'Photo',
 		displayType: 'image'
 	},
-	
+
 	// Email address with mailto link
 	{
 		name: 'contactEmail',
@@ -263,11 +483,13 @@ npm run build   # Rebuild the library
 
 ### Options API
 
-| Option             | Type     | Default     | Description                                       |
-| ------------------ | -------- | ----------- | ------------------------------------------------- |
-| `enableHover`      | boolean  | `true`      | Enable popup display on hover                     |
-| `properties`       | PropertyConfig[] \| string[] | `undefined` | Whitelist of properties to display with optional configuration |
-| `styleOptions`     | object   | `{}`        | Style configuration for the popup                 |
+| Option               | Type                         | Default     | Description                                                          |
+| -------------------- | ---------------------------- | ----------- | -------------------------------------------------------------------- |
+| `enableHover`        | boolean                      | `true`      | Enable popup display on hover                                        |
+| `properties`         | PropertyConfig[] \| string[] | `undefined` | Whitelist of properties to display with optional configuration       |
+| `excludeDataSources` | DataSourcePattern[]          | `undefined` | DataSource patterns to exclude from popup display (string or RegExp) |
+| `includeDataSources` | DataSourcePattern[]          | `undefined` | DataSource patterns to include for popup display (whitelist)         |
+| `styleOptions`       | object                       | `{}`        | Style configuration for the popup                                    |
 
 #### Style Options
 
@@ -329,11 +551,15 @@ The library uses a **Strategy Pattern** to handle different entity types:
  * Property display types
  */
 export type PropertyDisplayType =
-	| 'text'    // Regular text (default)
-	| 'link'    // Hyperlink
-	| 'image'   // Image
-	| 'email';  // Email address
+	| 'text' // Regular text (default)
+	| 'link' // Hyperlink
+	| 'image' // Image
+	| 'email'; // Email address
 
+/**
+ * DataSource pattern type
+ */
+export type DataSourcePattern = string | RegExp;
 
 /**
  * Property configuration
@@ -355,6 +581,10 @@ export interface EntityPopupOptions {
 	enableHover?: boolean;
 	/** Properties whitelist configuration */
 	properties?: PropertyConfig[] | string[];
+	/** DataSource patterns to exclude from popup display (string for exact match, RegExp for pattern matching) */
+	excludeDataSources?: DataSourcePattern[];
+	/** DataSource patterns to include for popup display (whitelist) */
+	includeDataSources?: DataSourcePattern[];
 	/** Popup CSS settings */
 	styleOptions?: {
 		/** Popup width in pixels */
@@ -567,23 +797,23 @@ const popupOptions = {
    	import { browser } from '$app/environment';
    	import { EntityPopup } from 'cesium-properties-popup';
    	import type * as CesiumType from 'cesium';
-   
+
    	let cesium: typeof CesiumType | undefined = $state();
    	let viewer: CesiumType.Viewer | undefined = $state();
    	let viewerReady = $state(false);
    	let theme = $state('light');
-   
+
    	function toggleTheme() {
    		theme = theme === 'light' ? 'dark' : 'light';
    	}
-   
+
    	// Reactive popup options based on theme
    	const popupOptions = $derived({
    		styleOptions: {
    			popupClass: theme === 'light' ? 'light-theme' : 'dark-theme'
    		}
    	});
-   
+
    	onMount(async (): Promise<void> => {
    		// Cesium initialization (see Basic Usage example)
    		// ...

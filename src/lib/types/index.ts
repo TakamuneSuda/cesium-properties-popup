@@ -13,6 +13,12 @@ export type PropertyDisplayType =
 	| 'email'; // メールアドレス
 
 /**
+ * DataSourceフィルタリングのパターン型
+ * 文字列（完全一致）または正規表現パターンを指定可能
+ */
+export type DataSourcePattern = string | RegExp;
+
+/**
  * プロパティ設定の型定義
  */
 export interface PropertyConfig {
@@ -35,6 +41,37 @@ export interface EntityPopupOptions {
 
 	/** 表示するプロパティのホワイトリスト */
 	properties?: PropertyConfig[] | string[];
+
+	/**
+	 * ポップアップを表示しないDataSource（レイヤー）の名前パターンリスト
+	 * 文字列の場合は完全一致、RegExpの場合は正規表現マッチング
+	 * DataSource.nameで判定
+	 *
+	 * @example
+	 * ```typescript
+	 * excludeDataSources: [
+	 *   'exact-name',        // 完全一致
+	 *   /^temp-/,            // "temp-" で始まるもの
+	 *   /.*-draft$/          // "-draft" で終わるもの
+	 * ]
+	 * ```
+	 */
+	excludeDataSources?: DataSourcePattern[];
+
+	/**
+	 * ポップアップを表示するDataSource（レイヤー）の名前パターンリスト（ホワイトリスト）
+	 * 文字列の場合は完全一致、RegExpの場合は正規表現マッチング
+	 * 指定した場合、これらのパターンにマッチするDataSourceのエンティティのみポップアップを表示
+	 *
+	 * @example
+	 * ```typescript
+	 * includeDataSources: [
+	 *   'layer1',            // 完全一致
+	 *   /^data-.*$/          // "data-" で始まるもの
+	 * ]
+	 * ```
+	 */
+	includeDataSources?: DataSourcePattern[];
 
 	/** ポップアップのCSS設定 */
 	styleOptions?: {
