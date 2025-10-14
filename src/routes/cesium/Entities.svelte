@@ -44,17 +44,23 @@
 		}
 
 		try {
-			const { Color, GeoJsonDataSource } = cesium;
+			const { Color, CustomDataSource } = cesium;
 
 			// Add data attributions first
 			addDataAttributions();
 
-			// Load point data and add as entities
-			const pointsDataSource = await GeoJsonDataSource.load('/sample/points.geojson');
-			pointsDataSource.entities.values.forEach((entity) => {
+			// Create DataSources for each layer
+			const roadStationsDataSource = new CustomDataSource('road-stations');
+			const railwaysDataSource = new CustomDataSource('railways');
+			const lakesDataSource = new CustomDataSource('lakes');
+			const contentsDataSource = new CustomDataSource('contents');
+
+			// Load point data (road stations)
+			const pointsGeoJson = await cesium.GeoJsonDataSource.load('/sample/points.geojson');
+			pointsGeoJson.entities.values.forEach((entity) => {
 				const position = entity.position?.getValue(new cesium.JulianDate());
 				if (position) {
-					viewer.entities.add({
+					roadStationsDataSource.entities.add({
 						id: entity.id,
 						name: entity.name,
 						position: position,
@@ -70,10 +76,10 @@
 				}
 			});
 
-			// Load line (route) data
-			const linesDataSource = await GeoJsonDataSource.load('/sample/lines.geojson');
-			linesDataSource.entities.values.forEach((entity) => {
-				viewer.entities.add({
+			// Load line data (railways)
+			const linesGeoJson = await cesium.GeoJsonDataSource.load('/sample/lines.geojson');
+			linesGeoJson.entities.values.forEach((entity) => {
+				railwaysDataSource.entities.add({
 					id: entity.id,
 					name: entity.name,
 					polyline: {
@@ -87,10 +93,10 @@
 				});
 			});
 
-			// Load polygon data
-			const polygonsDataSource = await GeoJsonDataSource.load('/sample/polygons.geojson');
-			polygonsDataSource.entities.values.forEach((entity) => {
-				viewer.entities.add({
+			// Load polygon data (lakes)
+			const polygonsGeoJson = await cesium.GeoJsonDataSource.load('/sample/polygons.geojson');
+			polygonsGeoJson.entities.values.forEach((entity) => {
+				lakesDataSource.entities.add({
 					id: entity.id,
 					name: entity.name,
 					polygon: {
@@ -105,11 +111,11 @@
 			});
 
 			// Load contents data
-			const contentsDataSource = await GeoJsonDataSource.load('/sample/contents.geojson');
-			contentsDataSource.entities.values.forEach((entity) => {
+			const contentsGeoJson = await cesium.GeoJsonDataSource.load('/sample/contents.geojson');
+			contentsGeoJson.entities.values.forEach((entity) => {
 				const position = entity.position?.getValue(new cesium.JulianDate());
 				if (position) {
-					viewer.entities.add({
+					contentsDataSource.entities.add({
 						id: entity.id,
 						name: entity.name,
 						position: position,
@@ -124,6 +130,12 @@
 					});
 				}
 			});
+
+			// Add all DataSources to viewer
+			viewer.dataSources.add(roadStationsDataSource);
+			viewer.dataSources.add(railwaysDataSource);
+			viewer.dataSources.add(lakesDataSource);
+			viewer.dataSources.add(contentsDataSource);
 		} catch (error) {
 			console.error('Failed to add entities:', error);
 		}
