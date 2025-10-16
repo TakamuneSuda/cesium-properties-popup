@@ -1,25 +1,52 @@
 <script lang="ts">
 	import { formatPropertyValue, getPropertyEntries } from '../utils/entityHelpers';
-	import type { PopupContentProps, PropertyConfig } from '../types';
+	import { getApplicablePropertyConfig } from '../utils/layerPropertyHelper';
+	import type {
+		PopupContentProps,
+		PropertyConfig,
+		PropertyItem,
+		StaticTextContent
+	} from '../types';
 	import type * as CesiumType from 'cesium';
 	import PropertyValue from './PropertyValue.svelte';
 
 	// Add optional parameters from PopupContentProps
 	let { entity, cesium, options = {} }: PopupContentProps = $props();
 
+	// Type guard for StaticTextContent
+	function isStaticContent(item: PropertyItem): item is StaticTextContent {
+		return typeof item === 'object' && 'type' in item && item.type === 'static';
+	}
+
 	// Function to process properties based on configuration
 	function processProperties(entity: CesiumType.Entity): Array<[string, unknown, PropertyConfig?]> {
 		const allProperties = getPropertyEntries(entity);
+		console.log('All Properties:', allProperties);
 
-		// If properties option is specified (whitelist mode)
-		if (options.properties) {
-			const propertyList = options.properties;
+		// レイヤーに適用すべきプロパティ設定を取得
+		const applicableProperties = getApplicablePropertyConfig(
+			entity,
+			options.layerPropertyConfigs,
+			options.properties
+		);
+
+		// プロパティ設定がある場合（ホワイトリストモード）
+		if (applicableProperties) {
 			const propertyMap = new Map(allProperties);
-
-			// Filter and map based on whitelist
 			const processedProperties: Array<[string, unknown, PropertyConfig?]> = [];
 
-			for (const prop of propertyList) {
+			for (const prop of applicableProperties) {
+				// 静的テキストの場合
+				if (isStaticContent(prop)) {
+					const config: PropertyConfig = {
+						name: prop.label, // labelをnameとして使用
+						displayType: prop.displayType
+					};
+					processedProperties.push([prop.label, prop.value, config]);
+					continue;
+				}
+
+				// 動的プロパティの場合
 				const config: PropertyConfig = typeof prop === 'string' ? { name: prop } : prop;
 
 				const value = propertyMap.get(config.name);
@@ -32,7 +59,7 @@
 			return processedProperties;
 		}
 
-		// Return all properties by default
+		// デフォルト: すべてのプロパティを表示
 		return allProperties.map(([key, value]) => [key, value, undefined]);
 	}
 

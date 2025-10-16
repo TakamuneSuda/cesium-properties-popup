@@ -221,6 +221,30 @@
 		// displayMode is reset to 'hover' in the LEFT_CLICK else clause,
 		// so there's no need to explicitly change displayMode in the current logic.
 	}
+
+	/**
+	 * Public API for external control
+	 * This allows parent components to programmatically control the popup
+	 */
+	export function close() {
+		closePopup();
+	}
+
+	export function open(entity: CesiumType.Entity) {
+		if (shouldShowPopupForEntity(entity)) {
+			selectedEntity = entity;
+			displayMode = 'click';
+			isPopupOpen = true;
+		}
+	}
+
+	export function isOpen(): boolean {
+		return isPopupOpen;
+	}
+
+	export function getSelectedEntity(): CesiumType.Entity | undefined {
+		return selectedEntity;
+	}
 </script>
 
 {#if isPopupOpen && selectedEntity}

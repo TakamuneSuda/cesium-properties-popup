@@ -1,9 +1,12 @@
 <script lang="ts">
 	import Map from './cesium/Map.svelte';
-	import type { EntityPopupOptions, EntityEventContext } from '$lib/types';
+	import type { EntityPopupOptions, EntityEventContext, EntityPopupAPI } from '$lib/types';
 	import { writable } from 'svelte/store';
 	import { untrack } from 'svelte';
 	import './themes.css';
+
+	// Reference to EntityPopup component for programmatic control
+	let popupApi: EntityPopupAPI | undefined = $state(undefined);
 
 	// Callback event tracking
 	interface CallbackEvent {
@@ -33,7 +36,7 @@
 	];
 
 	// Property selection mode
-	type PropertyMode = 'all' | 'whitelist' | 'whitelist-with-names';
+	type PropertyMode = 'all' | 'whitelist' | 'whitelist-with-names' | 'layer-specific';
 	let propertyMode: PropertyMode = 'whitelist-with-names';
 
 	// Layer filter mode
@@ -112,6 +115,10 @@
 		{ name: 'contents', displayName: 'Contents', enabled: true }
 	];
 
+	// Layer-specific configuration
+	let useLayerSpecificConfig = $state(false);
+	let layerSpecificEnabled = $state(false);
+
 	// Calculate excluded DataSources based on disabled layers
 	let excludedDataSources = $derived(
 		layers.filter((layer) => !layer.enabled).map((layer) => layer.name)
@@ -182,6 +189,9 @@
 		console.log('🔧 Updated popup options:', newOptions);
 	}
 
+	// Example: Close popup on click (toggle this feature)
+	let closePopupOnClick = $state(false);
+
 	// Callback functions
 	function handleEntityClick(context: EntityEventContext) {
 		if (!callbacksEnabled) return;
@@ -195,6 +205,14 @@
 		});
 
 		console.log('Entity clicked:', context);
+
+		// Example: Programmatically close popup after click
+		if (closePopupOnClick && popupApi) {
+			// Close popup after a short delay
+			setTimeout(() => {
+				popupApi?.close();
+			}, 1000);
+		}
 	}
 
 	function handleEntityHover(context: EntityEventContext) {
@@ -285,6 +303,66 @@
 		return [];
 	}
 
+	// Get layer-specific property configurations
+	function getLayerPropertyConfigs(): import('$lib/types').LayerPropertyConfig[] {
+		return [
+			{
+				layerPattern: 'road-stations',
+				properties: [
+					{ type: 'static', label: 'Category', value: 'Road Station' },
+					...roadStationProperties
+						.filter((p) => p.selected)
+						.map((p) => ({
+							name: p.code,
+							displayName: p.name,
+							displayType: p.displayType
+						}))
+				]
+			},
+			{
+				layerPattern: 'railways',
+				properties: [
+					{ type: 'static', label: 'Category', value: 'Railway' },
+					...railwayProperties
+						.filter((p) => p.selected)
+						.map((p) => ({
+							name: p.code,
+							displayName: p.name,
+							displayType: p.displayType
+						})),
+					{ type: 'static', label: 'Data Source', value: 'National Land Numerical Information' }
+				]
+			},
+			{
+				layerPattern: 'lakes',
+				properties: [
+					{ type: 'static', label: 'Category', value: 'Lake' },
+					...lakeProperties
+						.filter((p) => p.selected)
+						.map((p) => ({
+							name: p.code,
+							displayName: p.name,
+							displayType: p.displayType
+						}))
+				]
+			},
+			{
+				layerPattern: 'contents',
+				properties: [
+					{ type: 'static', label: 'Category', value: 'Tourist Spot' },
+					...contentsProperties
+						.filter((p) => p.selected)
+						.map((p) => ({
+							name: p.code,
+							displayName: p.name,
+							displayType: p.displayType
+						})),
+					{ type: 'static', label: 'Info', value: 'Click for more details', displayType: 'text' }
+				]
+			}
+		];
+	}
+
 	// Update property mode
 	function updatePropertyMode(mode: PropertyMode) {
 		propertyMode = mode;
@@ -293,10 +371,16 @@
 		switch (mode) {
 			case 'all':
 				newOptions.properties = undefined;
+				newOptions.layerPropertyConfigs = undefined;
 				break;
 			case 'whitelist':
 			case 'whitelist-with-names':
 				newOptions.properties = getSelectedPropertiesInOrder();
+				newOptions.layerPropertyConfigs = undefined;
+				break;
+			case 'layer-specific':
+				newOptions.layerPropertyConfigs = getLayerPropertyConfigs();
+				newOptions.properties = [{ name: 'name', displayName: 'Name' }]; // Default fallback
 				break;
 		}
 
@@ -309,7 +393,11 @@
 		if (prop) {
 			prop.selected = !prop.selected;
 			properties = [...properties]; // Trigger reactivity
-			if (propertyMode === 'whitelist' || propertyMode === 'whitelist-with-names') {
+			if (
+				propertyMode === 'whitelist' ||
+				propertyMode === 'whitelist-with-names' ||
+				propertyMode === 'layer-specific'
+			) {
 				updatePropertyMode(propertyMode);
 			}
 		}
@@ -332,7 +420,11 @@
 			else if (properties === lakeProperties) lakeProperties = newProperties;
 			else if (properties === contentsProperties) contentsProperties = newProperties;
 
-			if (propertyMode === 'whitelist' || propertyMode === 'whitelist-with-names') {
+			if (
+				propertyMode === 'whitelist' ||
+				propertyMode === 'whitelist-with-names' ||
+				propertyMode === 'layer-specific'
+			) {
 				updatePropertyMode(propertyMode);
 			}
 		}
@@ -355,7 +447,11 @@
 			else if (properties === lakeProperties) lakeProperties = newProperties;
 			else if (properties === contentsProperties) contentsProperties = newProperties;
 
-			if (propertyMode === 'whitelist' || propertyMode === 'whitelist-with-names') {
+			if (
+				propertyMode === 'whitelist' ||
+				propertyMode === 'whitelist-with-names' ||
+				propertyMode === 'layer-specific'
+			) {
 				updatePropertyMode(propertyMode);
 			}
 		}
@@ -365,7 +461,7 @@
 <div class="flex h-screen w-screen">
 	<!-- Map area -->
 	<div class="relative flex-1 overflow-hidden">
-		<Map popupOptions={$popupOptions} />
+		<Map bind:popupApi popupOptions={$popupOptions} />
 	</div>
 
 	<!-- Control panel -->
@@ -616,7 +712,24 @@
 					<option value="all">Show All Properties</option>
 					<option value="whitelist">Select Properties (Codes)</option>
 					<option value="whitelist-with-names">Select Properties (Names)</option>
+					<option value="layer-specific">Layer-Specific Configuration</option>
 				</select>
+
+				{#if propertyMode === 'layer-specific'}
+					<div class="mt-2 rounded bg-green-50 p-3 text-xs text-green-800">
+						<p class="font-semibold">✨ Layer-Specific Configuration Enabled</p>
+						<p class="mt-1">Each layer displays different properties with static text labels:</p>
+						<ul class="mt-2 ml-4 list-disc space-y-1">
+							<li><strong>Road Stations:</strong> Category label + selected properties</li>
+							<li><strong>Railways:</strong> Category label + properties + Data Source info</li>
+							<li><strong>Lakes:</strong> Category label + selected properties</li>
+							<li><strong>Contents:</strong> Category label + properties + Info text</li>
+						</ul>
+						<p class="mt-2 text-gray-600">
+							Try clicking on different layers to see the difference!
+						</p>
+					</div>
+				{/if}
 			</div>
 
 			{#if propertyMode === 'whitelist' || propertyMode === 'whitelist-with-names'}
@@ -859,6 +972,45 @@
 			</div>
 		</div>
 
+		<!-- Programmatic Control Section -->
+		<div class="mb-6">
+			<h3 class="mb-2 text-lg font-semibold">Programmatic Control</h3>
+			<div class="mb-3 rounded bg-blue-50 p-3 text-sm">
+				<p class="font-medium">Control popup via API</p>
+				<p class="mt-1 text-xs">
+					Use <code class="rounded bg-white px-1">bind:this</code> to access popup methods
+				</p>
+			</div>
+
+			<div class="mb-3 space-y-2">
+				<button
+					onclick={() => popupApi?.close()}
+					disabled={!popupApi}
+					class="w-full rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+				>
+					Close Popup
+				</button>
+
+				<div class="rounded border bg-gray-50 p-2 text-xs">
+					<p class="mb-1 font-medium">API Status:</p>
+					<div class="space-y-1">
+						<div>API Available: <strong>{popupApi ? '✓ Yes' : '✗ No'}</strong></div>
+						<div>Popup Open: <strong>{popupApi?.isOpen() ? '✓ Yes' : '✗ No'}</strong></div>
+						<div>
+							Selected Entity: <strong>{popupApi?.getSelectedEntity()?.id ?? 'None'}</strong>
+						</div>
+					</div>
+				</div>
+
+				<div class="mb-3">
+					<label class="flex items-center">
+						<input type="checkbox" bind:checked={closePopupOnClick} class="mr-2" />
+						<span class="text-sm">Auto-close popup 1s after click (Demo)</span>
+					</label>
+				</div>
+			</div>
+		</div>
+
 		<!-- Callback Events Section -->
 		<div class="mb-6">
 			<h3 class="mb-2 text-lg font-semibold">Event Callbacks</h3>
@@ -923,6 +1075,93 @@
 					for detailed logs.
 				</div>
 			{/if}
+		</div>
+
+		<!-- Debug: Current Options Configuration -->
+		<div class="mb-6 border-t pt-6">
+			<h3 class="mb-2 text-lg font-semibold">🔍 Current Options (Debug)</h3>
+			<div class="mb-2 rounded bg-yellow-50 p-2 text-xs text-yellow-800">
+				<strong>Note:</strong> This shows the actual options passed to EntityPopup
+			</div>
+
+			<div class="space-y-3">
+				<!-- Basic Options -->
+				<div>
+					<p class="mb-1 text-sm font-medium text-gray-700">Basic Options:</p>
+					<div class="rounded bg-gray-50 p-2 font-mono text-xs">
+						<div>enableHover: <strong>{$popupOptions.enableHover}</strong></div>
+						<div>showPopup: <strong>{$popupOptions.showPopup ?? true}</strong></div>
+					</div>
+				</div>
+
+				<!-- Layer Filters -->
+				{#if $popupOptions.includeDataSources || $popupOptions.excludeDataSources}
+					<div>
+						<p class="mb-1 text-sm font-medium text-gray-700">Layer Filters:</p>
+						<div class="rounded bg-gray-50 p-2 font-mono text-xs">
+							{#if $popupOptions.includeDataSources}
+								<div class="mb-1">
+									<span class="text-green-600">includeDataSources:</span>
+									<div class="ml-2">
+										{JSON.stringify($popupOptions.includeDataSources, null, 2)}
+									</div>
+								</div>
+							{/if}
+							{#if $popupOptions.excludeDataSources}
+								<div>
+									<span class="text-red-600">excludeDataSources:</span>
+									<div class="ml-2">
+										{JSON.stringify($popupOptions.excludeDataSources, null, 2)}
+									</div>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Properties Configuration -->
+				{#if $popupOptions.properties || $popupOptions.layerPropertyConfigs}
+					<div>
+						<p class="mb-1 text-sm font-medium text-gray-700">Property Configuration:</p>
+						<div class="max-h-96 overflow-y-auto rounded bg-gray-50 p-2 font-mono text-xs">
+							{#if $popupOptions.layerPropertyConfigs}
+								<div class="mb-2">
+									<span class="font-semibold text-purple-600">layerPropertyConfigs:</span>
+									<pre class="mt-1 whitespace-pre-wrap">{JSON.stringify(
+											$popupOptions.layerPropertyConfigs,
+											null,
+											2
+										)}</pre>
+								</div>
+							{/if}
+							{#if $popupOptions.properties}
+								<div>
+									<span class="font-semibold text-blue-600">properties (default):</span>
+									<pre class="mt-1 whitespace-pre-wrap">{JSON.stringify(
+											$popupOptions.properties,
+											null,
+											2
+										)}</pre>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Style Options -->
+				{#if $popupOptions.styleOptions}
+					<div>
+						<p class="mb-1 text-sm font-medium text-gray-700">Style Options:</p>
+						<div class="rounded bg-gray-50 p-2 font-mono text-xs">
+							<pre class="whitespace-pre-wrap">{JSON.stringify(
+									$popupOptions.styleOptions,
+									null,
+									2
+								)}</pre>
+						</div>
+					</div>
+				{/if}
+			</div>
 		</div>
 
 		<!-- Reset button -->

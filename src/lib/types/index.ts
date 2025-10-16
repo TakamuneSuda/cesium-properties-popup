@@ -53,6 +53,47 @@ export interface PropertyConfig {
 }
 
 /**
+ * 静的テキストコンテンツの設定
+ * プロパティリストの中に固定テキストを挿入できる
+ */
+export interface StaticTextContent {
+	/** コンテンツタイプ識別子 */
+	type: 'static';
+
+	/** 表示するラベル（左側に表示） */
+	label: string;
+
+	/** 表示する値（右側に表示） */
+	value: string;
+
+	/** オプション: 値の表示タイプ（text, link, image, email） */
+	displayType?: PropertyDisplayType;
+}
+
+/**
+ * プロパティアイテムの型
+ * PropertyConfig（動的プロパティ）、string（プロパティ名）、StaticTextContent（静的テキスト）のいずれか
+ */
+export type PropertyItem = PropertyConfig | string | StaticTextContent;
+
+/**
+ * レイヤー（DataSource）ごとのプロパティ設定
+ */
+export interface LayerPropertyConfig {
+	/**
+	 * 対象レイヤーのパターン（DataSource名）
+	 * 文字列の場合は完全一致、RegExpの場合は正規表現マッチング
+	 */
+	layerPattern: DataSourcePattern;
+
+	/**
+	 * このレイヤーで表示するプロパティのリスト
+	 * PropertyConfig（動的プロパティ）、string（プロパティ名）、StaticTextContent（静的テキスト）を含められる
+	 */
+	properties: PropertyItem[];
+}
+
+/**
  * EntityPopupコンポーネントのオプション
  */
 export interface EntityPopupOptions {
@@ -92,6 +133,38 @@ export interface EntityPopupOptions {
 	 * ```
 	 */
 	includeDataSources?: DataSourcePattern[];
+
+	/**
+	 * レイヤー（DataSource）ごとのプロパティ設定
+	 * 各レイヤーパターンに対して個別のプロパティリストを設定可能
+	 *
+	 * 優先順位:
+	 * 1. layerPropertyConfigs でマッチした設定
+	 * 2. properties（デフォルト設定）
+	 * 3. すべてのプロパティを表示
+	 *
+	 * @example
+	 * ```typescript
+	 * layerPropertyConfigs: [
+	 *   {
+	 *     layerPattern: 'buildings',  // 完全一致
+	 *     properties: [
+	 *       { type: 'static', label: 'カテゴリ', value: '建物' },
+	 *       'name',
+	 *       { name: 'height', displayName: '高さ (m)' }
+	 *     ]
+	 *   },
+	 *   {
+	 *     layerPattern: /^sensor-.*$/,  // 正規表現
+	 *     properties: [
+	 *       { name: 'id', displayName: 'センサーID' },
+	 *       { name: 'value', displayType: 'text' }
+	 *     ]
+	 *   }
+	 * ]
+	 * ```
+	 */
+	layerPropertyConfigs?: LayerPropertyConfig[];
 
 	/** ポップアップのCSS設定 */
 	styleOptions?: {
@@ -190,6 +263,35 @@ export interface PopupPositionerProps {
 	isPopupOpen: boolean;
 	options?: EntityPopupOptions;
 	children?: import('svelte').Snippet;
+}
+
+/**
+ * EntityPopup コンポーネントの公開API
+ * bind:this を使用して取得できるメソッド
+ */
+export interface EntityPopupAPI {
+	/**
+	 * ポップアップを閉じる
+	 */
+	close(): void;
+
+	/**
+	 * 指定したエンティティのポップアップを開く
+	 * @param entity - 表示するエンティティ
+	 */
+	open(entity: Cesium.Entity): void;
+
+	/**
+	 * ポップアップが開いているか確認
+	 * @returns ポップアップが開いている場合 true
+	 */
+	isOpen(): boolean;
+
+	/**
+	 * 現在選択されているエンティティを取得
+	 * @returns 選択中のエンティティ、または undefined
+	 */
+	getSelectedEntity(): Cesium.Entity | undefined;
 }
 
 /**

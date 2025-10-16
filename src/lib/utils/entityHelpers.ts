@@ -360,45 +360,8 @@ export function getPropertyEntries(entity: CesiumType.Entity): [string, unknown]
 			}
 		});
 
-		// プロパティの表示順序を調整する
-		// 特定のキーを優先して表示する
-		const sortedEntries: [string, unknown][] = [];
-
-		// 優先したいプロパティのリスト（これらを順番に表示）
-		const priorityKeys = [
-			'name',
-			'title',
-			'description',
-			'address',
-			'coordinates',
-			'area',
-			'height',
-			'established',
-			'opened',
-			'website',
-			'platforms',
-			'dailyPassengers',
-			'id'
-		];
-
-		// 優先キーを先頭に配置
-		priorityKeys.forEach((key) => {
-			const entry = propertyEntries.find(([name]) => name === key);
-			if (entry) {
-				sortedEntries.push(entry);
-			}
-		});
-
-		// 残りのプロパティをアルファベット順で追加
-		const remainingEntries = propertyEntries
-			.filter((entry) => !priorityKeys.includes(entry[0]))
-			.sort((a, b) => a[0].localeCompare(b[0]));
-
-		sortedEntries.push(...remainingEntries);
-
-		// 並べ替えたエントリで元の配列を置き換え
-		propertyEntries.length = 0;
-		propertyEntries.push(...sortedEntries);
+		// プロパティの表示順序は取得した順序のまま（ソートしない）
+		// properties または layerPropertyConfigs で明示的に指定した場合のみ、その順序で表示される
 	} catch (error: unknown) {
 		console.error(
 			'プロパティの取得中にエラーが発生しました:',
