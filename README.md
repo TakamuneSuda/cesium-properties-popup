@@ -15,11 +15,13 @@ demo site: [https://d2hgd9m8me42il.cloudfront.net/](https://d2hgd9m8me42il.cloud
 - [Layer Control](#layer-control)
 - [Event Callbacks](#event-callbacks)
 - [Property Selection and Display Types](#property-selection-and-display-types)
+- [Layer-Specific Property Configuration](#layer-specific-property-configuration)
 - [Customization Options](#customization-options)
 - [Styling](#styling)
 - [Component Architecture](#component-architecture)
 - [Type Definitions](#type-definitions)
 - [Advanced Usage](#advanced-usage)
+- [Programmatic Control](#programmatic-control)
 - [Utility Functions](#utility-functions)
 - [Implementation Guidelines](#implementation-guidelines)
 - [License](#license)
@@ -651,6 +653,323 @@ const propertyConfig: PropertyConfig[] = [
 ];
 ```
 
+## Layer-Specific Property Configuration
+
+### Overview
+
+You can configure different property display settings for each layer (DataSource). This allows you to:
+
+- Display different properties for different layers
+- Insert static text content alongside dynamic properties
+- Use string (exact match) or regular expressions to identify layers
+- Provide default configuration for unspecified layers
+
+### Basic Layer-Specific Configuration
+
+```typescript
+import { EntityPopup } from 'cesium-properties-popup';
+import type { EntityPopupOptions } from 'cesium-properties-popup';
+
+const options: EntityPopupOptions = {
+	layerPropertyConfigs: [
+		{
+			layerPattern: 'buildings', // Exact match
+			properties: ['name', 'height', 'floors']
+		},
+		{
+			layerPattern: 'roads', // Exact match
+			properties: ['name', 'type', 'lanes']
+		}
+	],
+	// Default configuration for layers not specified above
+	properties: ['name', 'description']
+};
+```
+
+### Using Static Text Content
+
+You can insert fixed text content into the property list alongside dynamic properties:
+
+```typescript
+const options: EntityPopupOptions = {
+	layerPropertyConfigs: [
+		{
+			layerPattern: 'buildings',
+			properties: [
+				// Static text at the top
+				{ type: 'static', label: 'Category', value: 'Building' },
+
+				// Dynamic properties from entity
+				'name',
+				{ name: 'height', displayName: 'Height (m)' },
+				'floors',
+
+				// Static text with link
+				{
+					type: 'static',
+					label: 'Department',
+					value: 'Urban Planning',
+					displayType: 'text'
+				}
+			]
+		}
+	]
+};
+```
+
+### Using Regular Expression Patterns
+
+Use regular expressions to match multiple layers with a single pattern:
+
+```typescript
+const options: EntityPopupOptions = {
+	layerPropertyConfigs: [
+		{
+			layerPattern: /^sensor-/, // Layers starting with "sensor-"
+			properties: [
+				{ type: 'static', label: 'Data Type', value: 'Sensor Data' },
+				{ name: 'id', displayName: 'Sensor ID' },
+				{ name: 'temperature', displayName: 'Temperature' },
+				{ name: 'humidity', displayName: 'Humidity' },
+				{
+					type: 'static',
+					label: 'Support',
+					value: 'https://example.com/support',
+					displayType: 'link'
+				}
+			]
+		},
+		{
+			layerPattern: /.*-draft$/, // Layers ending with "-draft"
+			properties: [
+				{ type: 'static', label: 'Status', value: 'Draft' },
+				'name',
+				'status',
+				'lastModified'
+			]
+		}
+	]
+};
+```
+
+### Priority and Fallback Behavior
+
+The system uses the following priority order:
+
+1. **Layer-specific config**: If `layerPropertyConfigs` contains a matching pattern, use that configuration
+2. **Default config**: If no layer pattern matches, use the `properties` option
+3. **All properties**: If neither is specified, display all entity properties
+
+```typescript
+const options: EntityPopupOptions = {
+	// Specific configurations for certain layers
+	layerPropertyConfigs: [
+		{
+			layerPattern: 'buildings',
+			properties: ['name', 'height'] // Only these for buildings
+		},
+		{
+			layerPattern: /^sensor-/,
+			properties: ['id', 'value'] // Only these for sensor layers
+		}
+	],
+
+	// Default for all other layers
+	properties: ['name', 'description']
+
+	// Note: If a layer matches neither layerPropertyConfigs nor properties,
+	// all of its properties will be displayed
+};
+```
+
+### Combining with Layer Filters
+
+Layer-specific property configs work seamlessly with `includeDataSources` and `excludeDataSources`:
+
+```typescript
+const options: EntityPopupOptions = {
+	// Control which layers show popups at all
+	includeDataSources: ['buildings', 'roads', /^sensor-/],
+
+	// Configure what each layer displays
+	layerPropertyConfigs: [
+		{
+			layerPattern: 'buildings',
+			properties: [
+				{ type: 'static', label: 'Category', value: 'Building' },
+				'name',
+				{ name: 'height', displayName: 'Height (m)' }
+			]
+		},
+		{
+			layerPattern: 'roads',
+			properties: ['name', 'type', 'lanes']
+		},
+		{
+			layerPattern: /^sensor-/,
+			properties: [{ type: 'static', label: 'Data Type', value: 'Sensor' }, 'id', 'value']
+		}
+	],
+
+	// Default for other included layers (if any)
+	properties: ['name']
+};
+```
+
+### Complete Example with Svelte
+
+```svelte
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import * as Cesium from 'cesium';
+	import { EntityPopup } from 'cesium-properties-popup';
+	import type { EntityPopupOptions } from 'cesium-properties-popup';
+
+	let viewer: Cesium.Viewer | undefined = $state(undefined);
+	let cesium = Cesium;
+
+	const popupOptions: EntityPopupOptions = {
+		layerPropertyConfigs: [
+			{
+				layerPattern: 'buildings',
+				properties: [
+					{ type: 'static', label: 'Category', value: 'Building' },
+					'name',
+					{ name: 'height', displayName: 'Height (m)' },
+					'floors'
+				]
+			},
+			{
+				layerPattern: /^sensor-/,
+				properties: [
+					{ type: 'static', label: 'Data Type', value: 'Sensor Data' },
+					{ name: 'id', displayName: 'Sensor ID' },
+					{ name: 'value', displayName: 'Measured Value' }
+				]
+			}
+		],
+		// Default configuration
+		properties: ['name', 'description']
+	};
+
+	onMount(() => {
+		viewer = new Cesium.Viewer('cesiumContainer');
+
+		// Add buildings layer
+		const buildingsDataSource = new Cesium.CustomDataSource('buildings');
+		buildingsDataSource.entities.add({
+			name: 'Tokyo Tower',
+			position: Cesium.Cartesian3.fromDegrees(139.7454, 35.6586, 0),
+			properties: {
+				height: 333,
+				floors: 2
+			},
+			point: {
+				pixelSize: 10,
+				color: Cesium.Color.RED
+			}
+		});
+		viewer.dataSources.add(buildingsDataSource);
+
+		// Add sensor layer
+		const sensorDataSource = new Cesium.CustomDataSource('sensor-temperature');
+		sensorDataSource.entities.add({
+			name: 'Temperature Sensor #1',
+			position: Cesium.Cartesian3.fromDegrees(139.75, 35.66, 0),
+			properties: {
+				id: 'TEMP-001',
+				value: '25.3°C'
+			},
+			point: {
+				pixelSize: 10,
+				color: Cesium.Color.BLUE
+			}
+		});
+		viewer.dataSources.add(sensorDataSource);
+	});
+</script>
+
+<div id="cesiumContainer" class="h-screen w-full"></div>
+
+{#if viewer}
+	<EntityPopup {viewer} {cesium} options={popupOptions} />
+{/if}
+```
+
+### Type Definitions for Layer Configuration
+
+```typescript
+/**
+ * Static text content configuration
+ */
+export interface StaticTextContent {
+	type: 'static';
+	label: string;
+	value: string;
+	displayType?: PropertyDisplayType;
+}
+
+/**
+ * Property item type
+ */
+export type PropertyItem = PropertyConfig | string | StaticTextContent;
+
+/**
+ * Layer-specific property configuration
+ */
+export interface LayerPropertyConfig {
+	layerPattern: DataSourcePattern; // string or RegExp
+	properties: PropertyItem[];
+}
+
+/**
+ * EntityPopup options (updated)
+ */
+export interface EntityPopupOptions {
+	// ... other options ...
+
+	/** Layer-specific property configurations */
+	layerPropertyConfigs?: LayerPropertyConfig[];
+
+	/** Default property configuration (fallback) */
+	properties?: PropertyItem[];
+}
+```
+
+### Display Results
+
+When you click or hover over entities from different layers:
+
+**Buildings layer:**
+
+```
+┌────────────────────────────────┐
+│ Category     │ Building        │
+│ name         │ Tokyo Tower     │
+│ Height (m)   │ 333             │
+│ floors       │ 2               │
+└────────────────────────────────┘
+```
+
+**Sensor layer (matching /^sensor-/):**
+
+```
+┌─────────────────────────────────────┐
+│ Data Type    │ Sensor Data          │
+│ Sensor ID    │ TEMP-001             │
+│ Measured Value│ 25.3°C              │
+└─────────────────────────────────────┘
+```
+
+**Other layers (using default config):**
+
+```
+┌────────────────────────────────┐
+│ name         │ Example Name    │
+│ description  │ Some desc...    │
+└────────────────────────────────┘
+```
+
 ## Development Setup
 
 If you encounter cache-related issues during development or debugging, you can clear the cache and rebuild using the following commands:
@@ -717,17 +1036,18 @@ npm run build   # Rebuild the library
 
 ### Options API
 
-| Option               | Type                                                          | Default     | Description                                                                        |
-| -------------------- | ------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------- |
-| `enableHover`        | boolean                                                       | `true`      | Enable popup display on hover                                                      |
-| `properties`         | PropertyConfig[] \| string[]                                  | `undefined` | Whitelist of properties to display with optional configuration                     |
-| `excludeDataSources` | DataSourcePattern[]                                           | `undefined` | DataSource patterns to exclude from popup display (string or RegExp)               |
-| `includeDataSources` | DataSourcePattern[]                                           | `undefined` | DataSource patterns to include for popup display (whitelist)                       |
-| `showPopup`          | boolean                                                       | `true`      | Whether to automatically show popup (can be controlled independently of callbacks) |
-| `onEntityClick`      | (context: EntityEventContext) => void \| Promise\<void\>      | `undefined` | Callback executed when an entity is clicked                                        |
-| `onEntityHover`      | (context: EntityEventContext) => void \| Promise\<void\>      | `undefined` | Callback executed when an entity is hovered                                        |
-| `onEmptyClick`       | (position: {x: number, y: number}) => void \| Promise\<void\> | `undefined` | Callback executed when empty space is clicked                                      |
-| `styleOptions`       | object                                                        | `{}`        | Style configuration for the popup                                                  |
+| Option                 | Type                                                          | Default     | Description                                                                                                         |
+| ---------------------- | ------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------- |
+| `enableHover`          | boolean                                                       | `true`      | Enable popup display on hover                                                                                       |
+| `properties`           | PropertyItem[]                                                | `undefined` | Default properties configuration (fallback when layer pattern doesn't match)                                        |
+| `layerPropertyConfigs` | LayerPropertyConfig[]                                         | `undefined` | Layer-specific property configurations (see [Layer-Specific Configuration](#layer-specific-property-configuration)) |
+| `excludeDataSources`   | DataSourcePattern[]                                           | `undefined` | DataSource patterns to exclude from popup display (string or RegExp)                                                |
+| `includeDataSources`   | DataSourcePattern[]                                           | `undefined` | DataSource patterns to include for popup display (whitelist)                                                        |
+| `showPopup`            | boolean                                                       | `true`      | Whether to automatically show popup (can be controlled independently of callbacks)                                  |
+| `onEntityClick`        | (context: EntityEventContext) => void \| Promise\<void\>      | `undefined` | Callback executed when an entity is clicked                                                                         |
+| `onEntityHover`        | (context: EntityEventContext) => void \| Promise\<void\>      | `undefined` | Callback executed when an entity is hovered                                                                         |
+| `onEmptyClick`         | (position: {x: number, y: number}) => void \| Promise\<void\> | `undefined` | Callback executed when empty space is clicked                                                                       |
+| `styleOptions`         | object                                                        | `{}`        | Style configuration for the popup                                                                                   |
 
 #### Style Options
 
@@ -826,13 +1146,44 @@ export interface PropertyConfig {
 }
 
 /**
+ * Static text content configuration
+ */
+export interface StaticTextContent {
+	/** Content type identifier */
+	type: 'static';
+	/** Label to display (left side) */
+	label: string;
+	/** Value to display (right side) */
+	value: string;
+	/** Optional: display type for the value */
+	displayType?: PropertyDisplayType;
+}
+
+/**
+ * Property item type
+ */
+export type PropertyItem = PropertyConfig | string | StaticTextContent;
+
+/**
+ * Layer-specific property configuration
+ */
+export interface LayerPropertyConfig {
+	/** Target layer pattern (DataSource name) */
+	layerPattern: DataSourcePattern;
+	/** Properties to display for this layer */
+	properties: PropertyItem[];
+}
+
+/**
  * EntityPopup component options
  */
 export interface EntityPopupOptions {
 	/** Whether to show popup on hover */
 	enableHover?: boolean;
-	/** Properties whitelist configuration */
-	properties?: PropertyConfig[] | string[];
+	/** Default properties configuration (fallback) */
+	properties?: PropertyItem[];
+	/** Layer-specific property configurations */
+	layerPropertyConfigs?: LayerPropertyConfig[];
 	/** DataSource patterns to exclude from popup display (string for exact match, RegExp for pattern matching) */
 	excludeDataSources?: DataSourcePattern[];
 	/** DataSource patterns to include for popup display (whitelist) */
@@ -924,6 +1275,116 @@ You can use individual components as needed for more custom implementations:
 {/if}
 ```
 
+## Programmatic Control
+
+You can programmatically control the popup using the component's public API with `bind:this`:
+
+```svelte
+<script lang="ts">
+	import { EntityPopup } from 'cesium-properties-popup';
+	import type { EntityPopupAPI } from 'cesium-properties-popup';
+	import type * as Cesium from 'cesium';
+
+	let viewer: Cesium.Viewer;
+	let cesium: typeof Cesium;
+	let popupApi: EntityPopupAPI;
+
+	// Function to programmatically close the popup
+	function closePopup() {
+		popupApi.close();
+	}
+
+	// Function to open popup for a specific entity
+	function openPopupForEntity(entity: Cesium.Entity) {
+		popupApi.open(entity);
+	}
+
+	// Check if popup is currently open
+	function checkPopupStatus() {
+		const isOpen = popupApi.isOpen();
+		const selectedEntity = popupApi.getSelectedEntity();
+		console.log('Popup open:', isOpen);
+		console.log('Selected entity:', selectedEntity);
+	}
+</script>
+
+<!-- Bind the component instance to popupApi -->
+<EntityPopup bind:this={popupApi} {viewer} {cesium} />
+
+<button onclick={closePopup}>Close Popup</button>
+```
+
+### API Reference
+
+The `EntityPopupAPI` interface provides the following methods:
+
+| Method                | Parameters              | Returns                      | Description                                                   |
+| --------------------- | ----------------------- | ---------------------------- | ------------------------------------------------------------- |
+| `close()`             | None                    | `void`                       | Closes the popup if it's currently open                       |
+| `open(entity)`        | `entity: Cesium.Entity` | `void`                       | Opens the popup for the specified entity                      |
+| `isOpen()`            | None                    | `boolean`                    | Returns `true` if the popup is currently open                 |
+| `getSelectedEntity()` | None                    | `Cesium.Entity \| undefined` | Returns the currently selected entity, or `undefined` if none |
+
+### Practical Examples
+
+#### Close Popup After Custom Action
+
+```typescript
+const popupOptions = {
+	onEntityClick: (context: EntityEventContext) => {
+		// Perform some action
+		console.log('Entity clicked:', context.entity.id);
+
+		// Close popup after 2 seconds
+		setTimeout(() => {
+			popupApi.close();
+		}, 2000);
+	}
+};
+```
+
+#### Toggle Popup Programmatically
+
+```typescript
+function togglePopup(entity: Cesium.Entity) {
+	if (popupApi.isOpen() && popupApi.getSelectedEntity()?.id === entity.id) {
+		popupApi.close();
+	} else {
+		popupApi.open(entity);
+	}
+}
+```
+
+#### External UI Integration
+
+```svelte
+<script lang="ts">
+	import { EntityPopup } from 'cesium-properties-popup';
+	import type { EntityPopupAPI } from 'cesium-properties-popup';
+
+	let popupApi: EntityPopupAPI;
+	let customPanelOpen = $state(false);
+
+	const options = {
+		// Disable automatic popup display
+		showPopup: false,
+
+		onEntityClick: (context) => {
+			// Use your own custom UI instead
+			customPanelOpen = true;
+			// But still track it internally
+			popupApi.open(context.entity);
+		}
+	};
+</script>
+
+<EntityPopup bind:this={popupApi} {viewer} {cesium} {options} />
+
+{#if customPanelOpen}
+	<CustomPanel entity={popupApi.getSelectedEntity()} />
+{/if}
+```
+
 ## Utility Functions
 
 You can directly use the utility functions provided by the library:
@@ -935,6 +1396,9 @@ import {
 	getEntityPosition,
 	worldPositionToScreenPosition,
 	calculatePopupPosition,
+	getDataSourceName,
+	getApplicablePropertyConfig,
+	matchesPattern,
 	defaultSettings
 } from 'cesium-properties-popup';
 
@@ -952,6 +1416,11 @@ const screenPosition = worldPositionToScreenPosition(position, viewer, cesium);
 
 // Comprehensive function to calculate popup position
 const popupPosition = await calculatePopupPosition(entity, viewer, cesium, currentPosition);
+
+// Layer-specific helper functions
+const dataSourceName = getDataSourceName(entity); // Get DataSource name from entity
+const isMatch = matchesPattern('sensor-01', /^sensor-/); // Check if pattern matches
+const applicableConfig = getApplicablePropertyConfig(entity, layerConfigs, defaultProps); // Get applicable property config
 
 // Change default settings (for performance tuning, etc.)
 defaultSettings.updateFrequency.cameraChangeThrottle = 150; // Change camera change throttling interval to 150ms

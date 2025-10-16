@@ -24,6 +24,11 @@ export {
 } from './utils/entityHelpers';
 export { calculatePopupPosition } from './utils/popupPositioning';
 export { throttle } from './utils/throttle';
+export {
+	getDataSourceName,
+	getApplicablePropertyConfig,
+	matchesPattern
+} from './utils/layerPropertyHelper';
 
 // エンティティポジション戦略のエクスポート
 export { entityPositionStrategies } from './utils/entityPositionStrategies';

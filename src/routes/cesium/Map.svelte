@@ -3,10 +3,12 @@
 	import { browser } from '$app/environment';
 	import { CESIUM_INITIAL_OPTIONS } from './cesiumUtil';
 	import type * as CesiumType from 'cesium';
+	import type { EntityPopupAPI } from '$lib/types';
 	import Entities from './Entities.svelte';
 	import { EntityPopup as LibraryEntityPopup } from '$lib';
 
-	let { popupOptions } = $props();
+	let { popupOptions, popupApi = $bindable() }: { popupOptions: any; popupApi?: EntityPopupAPI } =
+		$props();
 	// Cesium module is dynamically imported, so use import type
 	let cesium: typeof CesiumType | undefined = $state();
 	let viewer: CesiumType.Viewer | undefined = $state();
@@ -82,5 +84,5 @@
 {#if viewerReady && viewer && cesium}
 	<Entities {viewer} {cesium} />
 	<!-- Use library's EntityPopup component -->
-	<LibraryEntityPopup {viewer} {cesium} options={popupOptions} />
+	<LibraryEntityPopup bind:this={popupApi} {viewer} {cesium} options={popupOptions} />
 {/if}
